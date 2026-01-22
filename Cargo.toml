@@ -1,0 +1,17 @@
+[package]
+name = "host-discovery"
+version = "0.3.0"
+edition = "2021"
+description = "Network Topology Mapper - Phase 1: Host Discovery (ICMP + Active ARP)"
+authors = ["Network Topology Mapper Team"]
+
+[dependencies]
+tokio = { version = "1", features = ["full", "process"] }
+if-addrs = "0.13"
+ipnetwork = "0.20"
+surge-ping = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+pnet = "0.34"
+pnet_datalink = "0.34"
