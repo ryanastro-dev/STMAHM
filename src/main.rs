@@ -11,8 +11,8 @@ use std::net::Ipv4Addr;
 use std::time::Instant;
 
 use host_discovery::{
-    active_arp_scan, calculate_subnet_ips, find_valid_interface, icmp_scan, snmp_enrich,
-    tcp_probe_scan, HostInfo, InterfaceInfo, NeighborInfo, ScanResult, SNMP_ENABLED,
+    active_arp_scan, calculate_subnet_ips, find_valid_interface, icmp_scan, lookup_vendor,
+    snmp_enrich, tcp_probe_scan, HostInfo, InterfaceInfo, NeighborInfo, ScanResult, SNMP_ENABLED,
 };
 
 /// Logs a message to stderr
@@ -92,9 +92,11 @@ async fn scan_network(interface: &InterfaceInfo) -> Result<ScanResult> {
                 method.push_str("+SNMP");
             }
 
+            let mac_str = format!("{}", mac);
             HostInfo {
                 ip: ip.to_string(),
-                mac: format!("{}", mac),
+                vendor: lookup_vendor(&mac_str),
+                mac: mac_str,
                 response_time_ms: response_time,
                 open_ports,
                 discovery_method: method,
@@ -114,9 +116,11 @@ async fn scan_network(interface: &InterfaceInfo) -> Result<ScanResult> {
         .collect();
 
     // Add local machine to results
+    let local_mac = format!("{}", interface.mac);
     active_hosts.push(HostInfo {
         ip: interface.ip.to_string(),
-        mac: format!("{}", interface.mac),
+        vendor: lookup_vendor(&local_mac),
+        mac: local_mac,
         response_time_ms: Some(0),
         open_ports: Vec::new(),
         discovery_method: "LOCAL".to_string(),

@@ -26,6 +26,8 @@ pub struct HostInfo {
     pub ip: String,
     pub mac: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub vendor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub response_time_ms: Option<u64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub open_ports: Vec<u16>,
