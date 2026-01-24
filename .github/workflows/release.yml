@@ -70,13 +70,14 @@ jobs:
       # Platform-specific dependencies
       # =========================================
       
-      # Linux dependencies
+      # Linux dependencies (both webkit 4.0 and 4.1 for compatibility)
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libpcap-dev \
+            libwebkit2gtk-4.0-dev \
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
@@ -92,11 +93,7 @@ jobs:
           echo "NPCAP_SDK=C:\npcap-sdk" >> $env:GITHUB_ENV
         shell: pwsh
 
-      # macOS - Install libpcap (usually pre-installed)
-      - name: Verify libpcap (macOS)
-        if: startsWith(matrix.platform, 'macos')
-        run: |
-          brew list libpcap || brew install libpcap
+      # macOS - libpcap is pre-installed with the system, no action needed
 
       # =========================================
       # Build
@@ -116,7 +113,7 @@ jobs:
           args: --target ${{ matrix.target }}
 
       # =========================================
-      # Upload artifacts
+      # Upload artifacts (using wildcard for compatibility)
       # =========================================
       
       - name: Upload build artifacts
@@ -124,8 +121,9 @@ jobs:
         with:
           name: ${{ matrix.name }}
           path: |
-            ui/src-tauri/target/${{ matrix.target }}/release/bundle/
+            ui/src-tauri/target/**/release/bundle/**/*
           retention-days: 7
+          if-no-files-found: warn
 
   # ===========================================
   # Create GitHub Release (only on tags)
