@@ -1,142 +1,88 @@
-# Network Topology Mapper - Cross-Platform Release Build
-# Uses tauri-apps/tauri-action for automated builds and releases
-# Triggers on: push to main, pull requests, and version tags
-
 name: Build & Release
 
 on:
   push:
-    branches: [main]
-    tags: ['v*']
-  pull_request:
-    branches: [main]
-
-env:
-  CARGO_TERM_COLOR: always
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
-  # ===========================================
-  # Build for all desktop platforms
-  # ===========================================
   build:
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Windows x64
           - platform: windows-latest
-            target: x86_64-pc-windows-msvc
+            args: ""
             name: Windows-x64
-            
-          # macOS Intel
-          - platform: macos-13
-            target: x86_64-apple-darwin
-            name: macOS-Intel
-            
-          # macOS Apple Silicon
           - platform: macos-latest
-            target: aarch64-apple-darwin
+            args: "--target aarch64-apple-darwin"
             name: macOS-ARM64
-            
-          # Linux x64
           - platform: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
+            args: ""
             name: Linux-x64
 
     runs-on: ${{ matrix.platform }}
-    permissions:
-      contents: write
-    
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-          cache-dependency-path: ui/package-lock.json
 
-      - name: Setup Rust
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@v2
         with:
           workspaces: './ui/src-tauri -> target'
 
-      # =========================================
-      # Platform-specific dependencies
-      # =========================================
-      
       # Linux dependencies
-      - name: Install Linux dependencies
+      - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libpcap-dev \
-            libwebkit2gtk-4.0-dev \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            pkg-config
-          echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libpcap-dev
 
-      # Windows - Install Npcap SDK
+      # Windows - Npcap SDK
       - name: Install Npcap SDK (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
           Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile "npcap-sdk.zip"
           Expand-Archive -Path "npcap-sdk.zip" -DestinationPath "C:\npcap-sdk"
-          echo "LIB=C:\npcap-sdk\Lib\x64;$env:LIB" >> $env:GITHUB_ENV
+          echo "LIB=C:\npcap-sdk\Lib\x64" >> $env:GITHUB_ENV
         shell: pwsh
 
-      # macOS - Install libpcap via Homebrew
-      - name: Install libpcap (macOS)
-        if: startsWith(matrix.platform, 'macos')
-        run: |
-          brew install libpcap
-          echo "PKG_CONFIG_PATH=$(brew --prefix libpcap)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-          echo "LIBRARY_PATH=$(brew --prefix libpcap)/lib:$LIBRARY_PATH" >> $GITHUB_ENV
-
-      # =========================================
-      # Build and Release
-      # =========================================
-      
       - name: Install frontend dependencies
         working-directory: ui
-        run: npm ci
+        run: npm install
 
-      # Build Tauri app with tauri-action v0.5 (stable)
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0.5
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0.6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: ui
-          tauriScript: npm run tauri
-          args: --target ${{ matrix.target }}
-          # Release settings - only apply when pushing a tag
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('Network Topology Mapper {0}', github.ref_name) || '' }}
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Network Topology Mapper ${{ github.ref_name }}'
           releaseBody: |
-            ## Network Topology Mapper
+            ## Network Topology Mapper ${{ github.ref_name }}
             
             ### Downloads
-            - **Windows**: `.msi` or `.exe` installer
-            - **macOS Intel**: `.dmg` for Intel Macs
-            - **macOS ARM**: `.dmg` for Apple Silicon Macs
+            - **Windows**: `.msi` or `.exe` installer (Npcap required)
+            - **macOS ARM64**: `.dmg` for Apple Silicon Macs
             - **Linux**: `.deb` or `.AppImage`
             
             ### Requirements
-            - **Windows**: Npcap must be installed for network scanning
+            - **Windows**: Install [Npcap](https://npcap.com/#download) for network scanning
             - **macOS/Linux**: Run with sudo for ARP scanning
           releaseDraft: true
           prerelease: false
-          includeRelease: ${{ startsWith(github.ref, 'refs/tags/') }}
-          includeDebug: false
+          args: ${{ matrix.args }}
