@@ -89,17 +89,33 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
-      # Backup artifact upload with wildcards (in case tauri-action fails)
+      # 🔍 DEBUG - List all files to see exact paths
+      - name: 🔍 DEBUG - List all bundle files
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "Current Working Directory:"
+          pwd
+          echo "=========================================="
+          echo "Listing ALL bundle directories recursively:"
+          find . -type d -name "bundle" 2>/dev/null || echo "No bundle directories found"
+          echo "=========================================="
+          echo "Listing ALL .exe, .msi, .dmg, .deb, .AppImage files:"
+          find . -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null || echo "No installer files found"
+          echo "=========================================="
+        shell: bash
+
+      # Upload with super wildcards
       - name: Upload build artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
           path: |
-            **/target/release/bundle/nsis/*.exe
-            **/target/release/bundle/msi/*.msi
-            **/target/release/bundle/dmg/*.dmg
-            **/target/release/bundle/deb/*.deb
-            **/target/release/bundle/appimage/*.AppImage
-          retention-days: 7
+            **/target/release/bundle/**/*.deb
+            **/target/release/bundle/**/*.AppImage
+            **/target/release/bundle/**/*.exe
+            **/target/release/bundle/**/*.msi
+            **/target/release/bundle/**/*.dmg
           if-no-files-found: warn
+          retention-days: 7
