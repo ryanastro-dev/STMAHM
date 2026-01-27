@@ -1,6 +1,6 @@
 [package]
 name = "network-topology-mapper"
-version = "0.1.1"
+version = "0.1.2"
 description = "Network Topology Mapper Desktop Application"
 authors = ["Network Topology Mapper Team"]
 edition = "2021"
