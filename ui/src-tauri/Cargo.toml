@@ -11,6 +11,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
@@ -18,6 +20,12 @@ tokio = { version = "1", features = ["full"] }
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Network tools
+surge-ping = "0.8"
+
+# Demo mode
+chrono = { version = "0.4", features = ["serde"] }
 
 # Reference your existing scanner library
 host-discovery = { path = "../.." }

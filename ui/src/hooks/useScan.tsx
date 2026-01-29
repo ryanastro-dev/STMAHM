@@ -6,6 +6,21 @@ import { useState, useCallback, useEffect, createContext, useContext, ReactNode 
 import { invoke } from '@tauri-apps/api/core';
 
 // Types matching Rust ScanResult
+export interface VulnerabilityInfo {
+  cve_id: string;
+  description: string;
+  severity: string;
+  cvss_score?: number;
+}
+
+export interface PortWarning {
+  port: number;
+  service: string;
+  warning: string;
+  severity: string;
+  recommendation?: string;
+}
+
 export interface HostInfo {
   ip: string;
   mac: string;
@@ -21,6 +36,9 @@ export interface HostInfo {
   hostname?: string;
   system_description?: string;
   uptime_seconds?: number;
+  vulnerabilities?: VulnerabilityInfo[];
+  port_warnings?: PortWarning[];
+  security_grade?: string;
 }
 
 export interface ScanResult {
@@ -75,6 +93,9 @@ export function useScan() {
 
   // Perform a network scan
   const scan = useCallback(async () => {
+    // Check if demo mode is enabled
+    const isDemoMode = localStorage.getItem('demo-mode-enabled') === 'true';
+    
     // Always try to invoke - if it fails, we'll catch the error
     setState(prev => ({
       ...prev,
@@ -83,7 +104,9 @@ export function useScan() {
     }));
 
     try {
-      const result = await invoke<ScanResult>('scan_network');
+      // Use mock scan in demo mode, real scan otherwise
+      const command = isDemoMode ? 'mock_scan_network' : 'scan_network';
+      const result = await invoke<ScanResult>(command);
       
       setState({
         isScanning: false,

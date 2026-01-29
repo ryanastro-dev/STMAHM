@@ -110,8 +110,8 @@ fn upsert_device_from_host(conn: &Connection, host: &HostInfo, scan_id: i64) -> 
         r#"
         INSERT INTO device_history (
             scan_id, device_id, ip, response_time_ms, ttl, risk_score,
-            is_online, discovery_method, open_ports
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            security_grade, is_online, discovery_method, open_ports
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
         "#,
         params![
             scan_id,
@@ -120,6 +120,7 @@ fn upsert_device_from_host(conn: &Connection, host: &HostInfo, scan_id: i64) -> 
             host.response_time_ms.map(|t| t as i64),
             host.ttl.map(|t| t as i32),
             host.risk_score as i32,
+            &host.security_grade,
             true,
             &host.discovery_method,
             open_ports_str,
@@ -189,6 +190,7 @@ pub fn get_all_devices(conn: &Connection) -> Result<Vec<DeviceRecord>> {
                 os_guess: row.get(8)?,
                 custom_name: row.get(9)?,
                 notes: row.get(10)?,
+                security_grade: None,
             })
         })?
         .filter_map(|r| r.ok())
@@ -219,6 +221,7 @@ pub fn get_device_by_mac(conn: &Connection, mac: &str) -> Result<Option<DeviceRe
                 os_guess: row.get(8)?,
                 custom_name: row.get(9)?,
                 notes: row.get(10)?,
+                security_grade: None,
             })
         },
     );
@@ -426,6 +429,63 @@ fn parse_datetime(s: String) -> DateTime<Utc> {
     DateTime::parse_from_str(&format!("{} +0000", s), "%Y-%m-%d %H:%M:%S %z")
         .map(|dt| dt.with_timezone(&Utc))
         .unwrap_or_else(|_| Utc::now())
+}
+
+/// Lookup vulnerabilities for a vendor from CVE cache
+pub fn lookup_vulnerabilities(conn: &Connection, vendor: &str) -> Result<Vec<crate::models::VulnerabilityInfo>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT cve_id, description, severity, cvss_score
+        FROM cve_cache
+        WHERE LOWER(vendor) = LOWER(?1) OR vendor = '*'
+        ORDER BY cvss_score DESC NULLS LAST
+        "#,
+    )?;
+    
+    let vulns = stmt
+        .query_map(params![vendor], |row| {
+            Ok(crate::models::VulnerabilityInfo {
+                cve_id: row.get(0)?,
+                description: row.get(1)?,
+                severity: row.get(2)?,
+                cvss_score: row.get(3)?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+    
+    Ok(vulns)
+}
+
+/// Lookup port warnings for given ports
+pub fn lookup_port_warnings(conn: &Connection, ports: &[u16]) -> Result<Vec<crate::models::PortWarning>> {
+    if ports.is_empty() {
+        return Ok(Vec::new());
+    }
+    
+    let placeholders = ports.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let query = format!(
+        "SELECT port, service, warning, severity, recommendation FROM port_warnings WHERE port IN ({})",
+        placeholders
+    );
+    
+    let mut stmt = conn.prepare(&query)?;
+    let params: Vec<&dyn rusqlite::ToSql> = ports.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+    
+    let warnings = stmt
+        .query_map(params.as_slice(), |row| {
+            Ok(crate::models::PortWarning {
+                port: row.get::<_, i64>(0)? as u16,
+                service: row.get(1)?,
+                warning: row.get(2)?,
+                severity: row.get(3)?,
+                recommendation: row.get(4)?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+    
+    Ok(warnings)
 }
 
 #[cfg(test)]

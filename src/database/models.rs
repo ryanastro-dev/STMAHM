@@ -35,6 +35,7 @@ pub struct DeviceRecord {
     pub os_guess: Option<String>,
     pub custom_name: Option<String>,
     pub notes: Option<String>,
+    pub security_grade: Option<String>,
 }
 
 /// Device history entry (per-scan snapshot)

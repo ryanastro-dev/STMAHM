@@ -60,6 +60,18 @@ impl Database {
     fn initialize(&self) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         schema::create_tables(&conn)?;
+        
+        // Seed vulnerability database if empty
+        let cve_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM cve_cache", [], |row| row.get(0))
+            .unwrap_or(0);
+        
+        if cve_count == 0 {
+            use super::seed_cves::{seed_vulnerabilities, seed_port_warnings};
+            seed_vulnerabilities(&conn)?;
+            seed_port_warnings(&conn)?;
+        }
+        
         Ok(())
     }
 

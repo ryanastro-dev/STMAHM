@@ -7,6 +7,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod demo_data;
+
 
 use commands::{AppState, MonitorState};
 
@@ -32,6 +34,8 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(app_state)
         .manage(monitor_state)
         .invoke_handler(tauri::generate_handler![
@@ -57,6 +61,20 @@ fn main() {
             // AI Insights commands
             commands::get_network_health,
             commands::get_device_distribution,
+            // Export commands
+            commands::export_devices_to_csv,
+            commands::export_scan_to_csv,
+            commands::export_topology_to_json,
+            commands::export_scan_to_json,
+            commands::export_scan_report,
+            commands::export_security_report,
+            // Network Tools commands
+            commands::ping_host,
+            commands::scan_ports,
+            commands::lookup_mac_vendor,
+            // Demo Mode commands
+            commands::mock_scan_network,
+            commands::get_demo_alerts,
             // Debug
             commands::get_database_path,
         ])

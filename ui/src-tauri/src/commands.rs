@@ -16,9 +16,15 @@ use host_discovery::{
     guess_os_from_ttl,
     // Database
     Database, DeviceRecord, ScanRecord, NetworkStats, AlertRecord,
-    database::queries,
+    database::queries::{self, lookup_port_warnings},
     // Monitoring
     BackgroundMonitor, MonitoringStatus, NetworkEvent,
+    // Exports
+    export_devices_csv, export_hosts_csv, export_topology_json, 
+    export_scan_result_json, generate_scan_report_pdf, generate_network_health_pdf,
+    // Insights
+    SecurityReport,
+    insights::{calculate_security_grade, filter_vulnerabilities_by_context},
 };
 
 
@@ -135,7 +141,49 @@ pub async fn scan_network(state: tauri::State<'_, AppState>) -> Result<ScanResul
                 (false, false) => "ARP",
             }.to_string();
 
-            HostInfo {
+            // Lookup vulnerabilities and port warnings from database
+            let db_conn = state.db.lock().unwrap().connection();
+            let conn = db_conn.lock().unwrap();
+            
+            // Smart CVE filtering based on device type and open ports
+            let device_type_str = device_type.as_str();
+            let vulnerabilities = if let Some(ref vendor) = vendor_info.vendor {
+                filter_vulnerabilities_by_context(
+                    &conn,
+                    vendor,
+                    &device_type_str,
+                    &open_ports
+                ).unwrap_or_default()
+            } else {
+                // No vendor - only universal port warnings
+                let mut vulns = Vec::new();
+                if open_ports.contains(&23) {
+                    if let Ok(mut telnet) = filter_vulnerabilities_by_context(&conn, "", "Unknown", &[23]) {
+                        vulns.append(&mut telnet);
+                    }
+                }
+                if open_ports.contains(&21) {
+                    if let Ok(mut ftp) = filter_vulnerabilities_by_context(&conn, "", "Unknown", &[21]) {
+                        vulns.append(&mut ftp);
+                    }
+                }
+                if open_ports.contains(&80) {
+                    if let Ok(mut http) = filter_vulnerabilities_by_context(&conn, "", "Unknown", &[80]) {
+                        vulns.append(&mut http);
+                    }
+                }
+                vulns
+            };
+            
+            let port_warnings = if !open_ports.is_empty() {
+                lookup_port_warnings(&conn, &open_ports).unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+            
+            drop(conn); // Release lock
+
+            let mut host = HostInfo {
                 ip: ip.to_string(),
                 vendor: vendor_info.vendor,
                 is_randomized: vendor_info.is_randomized,
@@ -151,7 +199,15 @@ pub async fn scan_network(state: tauri::State<'_, AppState>) -> Result<ScanResul
                 system_description: None,
                 uptime_seconds: None,
                 neighbors: Vec::new(),
-            }
+                vulnerabilities,
+                port_warnings,
+                security_grade: String::new(),
+            };
+            
+            // Calculate security grade
+            host.security_grade = calculate_security_grade(&host);
+            
+            host
         })
         .collect();
 
@@ -165,7 +221,25 @@ pub async fn scan_network(state: tauri::State<'_, AppState>) -> Result<ScanResul
         false,
     );
     
-    active_hosts.push(HostInfo {
+    // Lookup vulnerabilities for local machine using smart filtering
+    let db_conn = state.db.lock().unwrap().connection();
+    let conn = db_conn.lock().unwrap();
+    
+    let local_device_type_str = local_device_type.as_str();
+    let local_vulnerabilities = if let Some(ref vendor) = local_vendor_info.vendor {
+        filter_vulnerabilities_by_context(
+            &conn,
+            vendor,
+            &local_device_type_str,
+            &[] // Local machine - no ports scanned
+        ).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    
+    drop(conn); // Release lock
+    
+    let mut local_host = HostInfo {
         ip: interface.ip.to_string(),
         vendor: local_vendor_info.vendor,
         is_randomized: local_vendor_info.is_randomized,
@@ -181,7 +255,15 @@ pub async fn scan_network(state: tauri::State<'_, AppState>) -> Result<ScanResul
         system_description: None,
         uptime_seconds: None,
         neighbors: Vec::new(),
-    });
+        vulnerabilities: local_vulnerabilities,
+        port_warnings: Vec::new(),
+        security_grade: String::new(),
+    };
+    
+    // Calculate security grade for local machine
+    local_host.security_grade = calculate_security_grade(&local_host);
+    
+    active_hosts.push(local_host);
 
     // Sort by IP
     active_hosts.sort_by(|a, b| {
@@ -373,7 +455,7 @@ pub async fn get_monitoring_status(
 
 // Note: NetworkHealth, DeviceDistribution, SecurityReport are available for future AI insights
 #[allow(unused_imports)]
-use host_discovery::{NetworkHealth, DeviceDistribution, SecurityReport};
+use host_discovery::{NetworkHealth, DeviceDistribution};
 
 /// Get network health score from current scan
 #[tauri::command]
@@ -493,3 +575,322 @@ pub fn get_device_distribution(
     }))
 }
 
+// =====================================================
+// Export Commands
+// =====================================================
+
+/// Export devices to CSV
+#[tauri::command]
+pub fn export_devices_to_csv(
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let db = state.db.lock().unwrap();
+    let conn = db.connection();
+    let conn = conn.lock().unwrap();
+    
+    let devices = queries::get_all_devices(&conn)
+        .map_err(|e| format!("Failed to get devices: {}", e))?;
+    
+    export_devices_csv(&devices)
+        .map_err(|e| format!("Failed to export CSV: {}", e))
+}
+
+/// Export current scan hosts to CSV
+#[tauri::command]
+pub fn export_scan_to_csv(
+    hosts: Vec<HostInfo>,
+) -> Result<String, String> {
+    export_hosts_csv(&hosts)
+        .map_err(|e| format!("Failed to export CSV: {}", e))
+}
+
+/// Export topology data to JSON
+#[tauri::command]
+pub fn export_topology_to_json(
+    hosts: Vec<HostInfo>,
+    network: String,
+) -> Result<String, String> {
+    export_topology_json(&hosts, &network)
+        .map_err(|e| format!("Failed to export JSON: {}", e))
+}
+
+/// Export full scan result to JSON
+#[tauri::command]
+pub fn export_scan_to_json(
+    scan: ScanResult,
+) -> Result<String, String> {
+    export_scan_result_json(&scan)
+        .map_err(|e| format!("Failed to export JSON: {}", e))
+}
+
+/// Generate and export scan report PDF
+#[tauri::command]
+pub fn export_scan_report(
+    state: tauri::State<'_, AppState>,
+    scan: ScanResult,
+    hosts: Vec<HostInfo>,
+) -> Result<Vec<u8>, String> {
+    let db = state.db.lock().unwrap();
+    let conn = db.connection();
+    let conn = conn.lock().unwrap();
+    
+    let stats = queries::get_network_stats(&conn).ok();
+    
+    generate_scan_report_pdf(&scan, &hosts, stats.as_ref())
+        .map_err(|e| format!("Failed to generate PDF: {}", e))
+}
+
+/// Generate and export network health/security report PDF
+#[tauri::command]
+pub fn export_security_report(
+    hosts: Vec<HostInfo>,
+) -> Result<Vec<u8>, String> {
+    let recommendations = SecurityReport::generate(&hosts);
+    
+    generate_network_health_pdf(&recommendations)
+        .map_err(|e| format!("Failed to generate PDF: {}", e))
+}
+
+
+// ==================== NETWORK TOOLS COMMANDS ====================
+
+/// Ping result with latency and TTL information
+#[derive(serde::Serialize)]
+pub struct PingResult {
+    success: bool,
+    latency_ms: Option<f64>,
+    ttl: Option<u8>,
+    os_guess: Option<String>,
+    error: Option<String>,
+}
+
+/// Ping a single host
+#[tauri::command]
+pub async fn ping_host(target: String, count: u32) -> Result<Vec<PingResult>, String> {
+    use std::net::{IpAddr, ToSocketAddrs};
+    use std::time::Duration;
+    use surge_ping::{Client, Config, PingIdentifier, PingSequence, IcmpPacket};
+
+    
+    // Resolve hostname to IP
+    let ip = if let Ok(addr) = target.parse::<IpAddr>() {
+        addr
+    } else {
+        // Try DNS resolution
+        let addr_str = format!("{}:0", target);
+        match addr_str.to_socket_addrs() {
+            Ok(mut addrs) => {
+                if let Some(socket_addr) = addrs.next() {
+                    socket_addr.ip()
+                } else {
+                    return Err("Could not resolve hostname".to_string());
+                }
+            }
+            Err(_) => return Err("Invalid IP address or hostname".to_string()),
+        }
+    };
+    
+    // Create ICMP client
+    let config = Config::default();
+    let client = Client::new(&config)
+        .map_err(|e| format!("Failed to create ICMP client: {}", e))?;
+    
+    let mut results = Vec::new();
+    let payload = [0u8; 56];
+    
+    for i in 0..count {
+        let start = Instant::now();
+        
+        let mut pinger = client.pinger(ip, PingIdentifier(1234)).await;
+        match tokio::time::timeout(
+            Duration::from_secs(2),
+            pinger.timeout(Duration::from_secs(2))
+                .ping(PingSequence(i as u16), &payload)
+        ).await {
+            Ok(Ok((packet, _rtt))) => {
+                let latency = start.elapsed().as_secs_f64() * 1000.0;
+                let ttl = match packet {
+                    IcmpPacket::V4(p) => p.get_ttl(),
+                    IcmpPacket::V6(_) => None,
+                };
+                let os_guess = ttl.map(|t| guess_os_from_ttl(t));
+                
+                results.push(PingResult {
+                    success: true,
+                    latency_ms: Some(latency),
+                    ttl,
+                    os_guess,
+                    error: None,
+                });
+            }
+            Ok(Err(e)) => {
+                results.push(PingResult {
+                    success: false,
+                    latency_ms: None,
+                    ttl: None,
+                    os_guess: None,
+                    error: Some(format!("Ping failed: {}", e)),
+                });
+            }
+            Err(_) => {
+                results.push(PingResult {
+                    success: false,
+                    latency_ms: None,
+                    ttl: None,
+                    os_guess: None,
+                    error: Some("Request timed out".to_string()),
+                });
+            }
+        }
+        
+        // Small delay between pings
+        if i < count - 1 {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    }
+    
+    Ok(results)
+}
+
+/// Port scan result
+#[derive(serde::Serialize)]
+pub struct PortScanResult {
+    port: u16,
+    is_open: bool,
+    service: Option<String>,
+}
+
+/// Scan ports on a target host
+#[tauri::command]
+pub async fn scan_ports(target: String, ports: Vec<u16>) -> Result<Vec<PortScanResult>, String> {
+    use std::net::{IpAddr, ToSocketAddrs};
+    use tokio::time::timeout;
+    use std::time::Duration;
+    
+    // Resolve hostname to IP
+    let ip = if let Ok(addr) = target.parse::<IpAddr>() {
+        addr
+    } else {
+        let addr_str = format!("{}:0", target);
+        match addr_str.to_socket_addrs() {
+            Ok(mut addrs) => {
+                if let Some(socket_addr) = addrs.next() {
+                    socket_addr.ip()
+                } else {
+                    return Err("Could not resolve hostname".to_string());
+                }
+            }
+            Err(_) => return Err("Invalid IP address or hostname".to_string()),
+        }
+    };
+    
+    let mut results = Vec::new();
+    
+    for port in ports {
+        let addr = std::net::SocketAddr::new(ip, port);
+        
+        let is_open = match timeout(
+            Duration::from_secs(2),
+            tokio::net::TcpStream::connect(addr)
+        ).await {
+            Ok(Ok(_)) => true,
+            _ => false,
+        };
+        
+        let service = if is_open {
+            Some(get_service_name(port))
+        } else {
+            None
+        };
+        
+        results.push(PortScanResult {
+            port,
+            is_open,
+            service,
+        });
+    }
+    
+    Ok(results)
+}
+
+/// Get common service name for a port
+fn get_service_name(port: u16) -> String {
+    match port {
+        20 => "FTP Data".to_string(),
+        21 => "FTP".to_string(),
+        22 => "SSH".to_string(),
+        23 => "Telnet".to_string(),
+        25 => "SMTP".to_string(),
+        53 => "DNS".to_string(),
+        80 => "HTTP".to_string(),
+        110 => "POP3".to_string(),
+        143 => "IMAP".to_string(),
+        443 => "HTTPS".to_string(),
+        445 => "SMB".to_string(),
+        3306 => "MySQL".to_string(),
+        3389 => "RDP".to_string(),
+        5432 => "PostgreSQL".to_string(),
+        8080 => "HTTP Alt".to_string(),
+        _ => "Unknown".to_string(),
+    }
+}
+
+/// MAC vendor lookup result
+#[derive(serde::Serialize)]
+pub struct VendorLookupResult {
+    mac: String,
+    vendor: Option<String>,
+    is_randomized: bool,
+}
+
+/// Look up vendor for a MAC address
+#[tauri::command]
+pub fn lookup_mac_vendor(mac: String) -> Result<VendorLookupResult, String> {
+    let vendor_info = lookup_vendor_info(&mac);
+    
+    Ok(VendorLookupResult {
+        mac: mac.clone(),
+        vendor: vendor_info.vendor,
+        is_randomized: vendor_info.is_randomized,
+    })
+}
+
+// ==================== DEMO MODE ====================
+
+/// Mock network scan for demo mode - returns pre-loaded sample data
+#[tauri::command]
+pub async fn mock_scan_network(app: tauri::AppHandle) -> Result<ScanResult, String> {
+    // Load demo data
+    let demo_scan = crate::demo_data::generate_demo_scan();
+    
+    // Simulate scanning delay for realism
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    
+    // Emit progress events (simulate scanning phases)
+    let _ = app.emit("scan-progress", serde_json::json!({
+        "phase": "arp",
+        "progress": 33
+    }));
+    
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    
+    let _ = app.emit("scan-progress", serde_json::json!({
+        "phase": "icmp",
+        "progress": 66
+    }));
+    
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    
+    let _ = app.emit("scan-progress", serde_json::json!({
+        "phase": "tcp",
+        "progress": 100
+    }));
+    
+    Ok(demo_scan)
+}
+
+/// Get demo alerts
+#[tauri::command]
+pub fn get_demo_alerts() -> Result<Vec<AlertRecord>, String> {
+    Ok(crate::demo_data::generate_demo_alerts())
+}

@@ -45,6 +45,15 @@ export default function Settings() {
   // UI state
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [hasChanges, setHasChanges] = useState(false);
+  
+  // Vulnerability database state
+  const [autoUpdateVulnDB, setAutoUpdateVulnDB] = useState(false);
+  const [syncRange, setSyncRange] = useState('latest_1000');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [embeddedCVEs] = useState(150); // Static count from seed data
+  const [downloadedCVEs] = useState(0); // Will be dynamic when backend is implemented
+  const [lastUpdate] = useState<string | null>(null);
 
   // Load settings on mount
   useEffect(() => {
@@ -90,6 +99,29 @@ export default function Settings() {
     setSaveStatus('saved');
     setHasChanges(false);
     setTimeout(() => setSaveStatus('idle'), 2000);
+  };
+
+  // Sync vulnerability database (UI-only simulation - backend to be implemented)
+  const handleSyncDatabase = () => {
+    setIsSyncing(true);
+    setSyncProgress(0);
+    
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setSyncProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          setTimeout(() => {
+            setIsSyncing(false);
+            setSyncProgress(0);
+            // Show success message (can be enhanced with toast notification)
+            alert(`✅ Sync simulated!\n\nRange: ${syncRange}\n\nNote: Backend NVD API integration not yet implemented.\nThis is a UI-only demo.`);
+          }, 500);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 200);
   };
 
   return (
@@ -180,6 +212,158 @@ export default function Settings() {
               />
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Demo Mode Settings */}
+      <section className="card p-6 mb-6">
+        <h2 className="text-lg font-semibold text-text-primary mb-4">🎪 Demo Mode</h2>
+        
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-text-secondary mb-1">
+                Enable Demo Mode
+              </label>
+              <p className="text-xs text-text-muted">
+                Use pre-loaded sample network data for offline demonstrations
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer ml-4">
+              <input
+                type="checkbox"
+                checked={localStorage.getItem('demo-mode-enabled') === 'true'}
+                onChange={(e) => {
+                  localStorage.setItem('demo-mode-enabled', e.target.checked.toString());
+                  window.location.reload(); // Reload to apply demo mode
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-bg-tertiary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-blue rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-blue"></div>
+            </label>
+          </div>
+
+          {/* Demo Mode Info */}
+          {localStorage.getItem('demo-mode-enabled') === 'true' && (
+            <div className="bg-accent-amber/10 border border-accent-amber/30 rounded-lg p-4">
+              <p className="text-sm text-text-secondary mb-2">
+                ⚠️ <strong>Demo Mode Active</strong>
+              </p>
+              <ul className="text-xs text-text-muted space-y-1 ml-4">
+                <li>• Network scans return sample data instantly</li>
+                <li>• 15 realistic demo devices with vulnerabilities</li>
+                <li>• All features work offline</li>
+                <li>• Perfect for presentations and demonstrations</li>
+              </ul>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Vulnerability Database Settings */}
+      <section className="card p-6 mb-6">
+        <h2 className="text-lg font-semibold text-text-primary mb-4">Vulnerability Database</h2>
+        
+        <div className="space-y-6">
+          {/* Auto-update Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-text-primary">Auto-update from NVD</p>
+              <p className="text-sm text-text-muted">
+                Automatically sync CVE database with National Vulnerability Database
+              </p>
+            </div>
+            <button
+              onClick={() => setAutoUpdateVulnDB(!autoUpdateVulnDB)}
+              className={`w-12 h-6 rounded-full transition-colors ${
+                autoUpdateVulnDB ? 'bg-accent-blue' : 'bg-bg-tertiary'
+              }`}
+            >
+              <div
+                className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
+                  autoUpdateVulnDB ? 'translate-x-6' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Sync Range Selector */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Sync Range
+            </label>
+            <select
+              value={syncRange}
+              onChange={(e) => setSyncRange(e.target.value)}
+              className="w-full px-4 py-2.5 bg-bg-tertiary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
+            >
+              <option value="latest_1000">Latest 1,000 CVEs (~500 KB)</option>
+              <option value="latest_5000">Latest 5,000 CVEs (~2.5 MB)</option>
+              <option value="last_30_days">Last 30 Days (~200 KB)</option>
+              <option value="last_90_days">Last 90 Days (~600 KB)</option>
+              <option value="last_6_months">Last 6 Months (~2 MB)</option>
+              <option value="last_1_year">Last 1 Year (~4 MB)</option>
+              <option value="custom">Custom Date Range</option>
+            </select>
+            <p className="text-xs text-text-muted mt-1">
+              Larger ranges provide better coverage but take longer to sync
+            </p>
+          </div>
+
+          {/* Database Status */}
+          <div className="bg-bg-tertiary rounded-lg p-4 space-y-2">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-text-muted">Embedded CVEs:</span>
+              <span className="font-mono text-text-primary font-semibold">{embeddedCVEs}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-text-muted">Downloaded CVEs:</span>
+              <span className="font-mono text-text-primary font-semibold">{downloadedCVEs}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm border-t border-white/10 pt-2">
+              <span className="text-text-muted">Total CVEs:</span>
+              <span className="font-mono text-accent-blue font-bold">{embeddedCVEs + downloadedCVEs}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-text-muted">Last Updated:</span>
+              <span className="text-text-primary">
+                {lastUpdate ? new Date(lastUpdate).toLocaleDateString() : 'Never'}
+              </span>
+            </div>
+          </div>
+
+          {/* Manual Sync Button */}
+          <button
+            onClick={handleSyncDatabase}
+            disabled={isSyncing}
+            className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
+              isSyncing
+                ? 'bg-accent-blue/50 text-white/70 cursor-not-allowed'
+                : 'bg-accent-blue hover:bg-accent-blue/80 text-white'
+            }`}
+          >
+            <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Syncing...' : 'Update Now'}</span>
+          </button>
+          
+          {/* Progress Bar */}
+          {isSyncing && syncProgress > 0 && (
+            <div className="space-y-1">
+              <div className="h-2 bg-bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-accent-blue transition-all duration-300"
+                  style={{ width: `${syncProgress}%` }}
+                />
+              </div>
+              <p className="text-xs text-center text-text-muted">
+                {syncProgress}% - Fetching CVE data...
+              </p>
+            </div>
+          )}
+          
+          <p className="text-xs text-text-muted text-center">
+            💡 Vulnerability database works offline by default. Online sync is optional.
+          </p>
         </div>
       </section>
 

@@ -10,11 +10,16 @@ import Dashboard from './pages/Dashboard';
 import TopologyView from './pages/TopologyView';
 import DeviceList from './pages/DeviceList';
 import Settings from './pages/Settings';
+import Reports from './pages/Reports';
+import Vulnerabilities from './pages/Vulnerabilities';
+import Alerts from './pages/Alerts';
+import Tools from './pages/Tools';
 import ComponentDemo from './pages/ComponentDemo';
 import DeviceDetailModal from './components/devices/DeviceDetailModal';
 import WelcomeScreen, { useWelcomeScreen } from './components/common/WelcomeScreen';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { ToastProvider } from './components/common/Toast';
+import DemoBanner from './components/common/DemoBanner';
 
 type Page = 'dashboard' | 'topology' | 'devices' | 'vulnerabilities' | 'alerts' | 'tools' | 'reports' | 'settings' | 'profile' | 'demo';
 
@@ -67,33 +72,13 @@ function AppContent() {
       case 'demo':
         return <ComponentDemo />;
       case 'vulnerabilities':
-        return (
-          <div className="p-8 text-center">
-            <h2 className="text-2xl font-bold text-text-primary mb-2">🛡️ Vulnerabilities</h2>
-            <p className="text-text-muted">Security vulnerability scanning - Coming soon</p>
-          </div>
-        );
+        return <Vulnerabilities />;
       case 'alerts':
-        return (
-          <div className="p-8 text-center">
-            <h2 className="text-2xl font-bold text-text-primary mb-2">🔔 Alerts</h2>
-            <p className="text-text-muted">Alert management - Coming soon</p>
-          </div>
-        );
+        return <Alerts />;
       case 'tools':
-        return (
-          <div className="p-8 text-center">
-            <h2 className="text-2xl font-bold text-text-primary mb-2">🛠️ Tools</h2>
-            <p className="text-text-muted">Network utilities - Coming soon</p>
-          </div>
-        );
+        return <Tools />;
       case 'reports':
-        return (
-          <div className="p-8 text-center">
-            <h2 className="text-2xl font-bold text-text-primary mb-2">📈 Reports</h2>
-            <p className="text-text-muted">Network reports & analytics - Coming soon</p>
-          </div>
-        );
+        return <Reports />;
       default:
         return <Dashboard onDeviceClick={handleDeviceSelect} onScan={handleScan} />;
     }
@@ -126,6 +111,9 @@ function AppContent() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Custom Titlebar (macOS/Windows controls) */}
         <Titlebar />
+        
+        {/* Demo Mode Banner */}
+        <DemoBanner />
         
         {/* Top Header (Search, Notifications, Theme) */}
         <TopHeader onSearch={handleSearch} />

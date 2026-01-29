@@ -13,6 +13,7 @@
 pub mod alerts;
 pub mod config;
 pub mod database;
+pub mod exports;
 pub mod insights;
 pub mod logging;
 pub mod models;
@@ -28,6 +29,7 @@ pub use network::{calculate_risk_score, calculate_subnet_ips, dns_scan, find_val
 pub use scanner::{active_arp_scan, icmp_scan, guess_os_from_ttl, IcmpResult, snmp_enrich, tcp_probe_scan, SnmpData, SnmpNeighbor};
 pub use alerts::{detect_alerts, Alert, has_high_priority_alerts};
 pub use insights::{NetworkHealth, DeviceDistribution, VendorDistribution, SecurityReport, Recommendation};
+pub use exports::{export_devices_csv, export_hosts_csv, export_topology_json, export_scan_result_json, generate_scan_report_pdf, generate_network_health_pdf};
 
 // Re-export logging macros for use across crate
 pub use crate::logging::macros;

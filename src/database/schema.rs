@@ -48,6 +48,7 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
             response_time_ms INTEGER,
             ttl INTEGER,
             risk_score INTEGER NOT NULL DEFAULT 0,
+            security_grade TEXT DEFAULT '',
             is_online INTEGER NOT NULL DEFAULT 1,
             discovery_method TEXT,
             open_ports TEXT,
@@ -69,6 +70,30 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
             FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE SET NULL
         );
 
+        -- CVE Cache table: vulnerability database
+        CREATE TABLE IF NOT EXISTS cve_cache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vendor TEXT NOT NULL,
+            product TEXT,
+            cve_id TEXT NOT NULL,
+            description TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            cvss_score REAL,
+            published_date TEXT,
+            source TEXT DEFAULT 'embedded',
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(vendor, cve_id)
+        );
+
+        -- Port Warnings table: insecure port information
+        CREATE TABLE IF NOT EXISTS port_warnings (
+            port INTEGER PRIMARY KEY,
+            service TEXT NOT NULL,
+            warning TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            recommendation TEXT
+        );
+
         -- Indexes for performance
         CREATE INDEX IF NOT EXISTS idx_scans_time ON scans(scan_time);
         CREATE INDEX IF NOT EXISTS idx_devices_mac ON devices(mac);
@@ -77,6 +102,8 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_device_history_device ON device_history(device_id);
         CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at);
         CREATE INDEX IF NOT EXISTS idx_alerts_unread ON alerts(is_read) WHERE is_read = 0;
+        CREATE INDEX IF NOT EXISTS idx_cve_vendor ON cve_cache(vendor);
+        CREATE INDEX IF NOT EXISTS idx_cve_severity ON cve_cache(severity);
         "#,
     )
     .context("Failed to create database tables")?;

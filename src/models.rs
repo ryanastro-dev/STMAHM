@@ -2,11 +2,11 @@
 
 use pnet::datalink::NetworkInterface;
 use pnet::util::MacAddr;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
 /// Result structure for the host discovery scan
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ScanResult {
     pub interface_name: String,
     pub local_ip: String,
@@ -21,14 +21,14 @@ pub struct ScanResult {
 }
 
 /// Information about a discovered host
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HostInfo {
     pub ip: String,
     pub mac: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vendor: Option<String>,
     /// True if MAC is locally administered (randomized/virtual)
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub is_randomized: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_time_ms: Option<u64>,
@@ -41,8 +41,9 @@ pub struct HostInfo {
     /// Inferred device type (ROUTER, MOBILE, PC, etc.)
     pub device_type: String,
     /// Risk score (0-100, higher = more risk)
+    #[serde(default)]
     pub risk_score: u8,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub open_ports: Vec<u16>,
     pub discovery_method: String,
     // DNS/SNMP hostname
@@ -52,12 +53,20 @@ pub struct HostInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uptime_seconds: Option<u64>,
     // LLDP/CDP neighbor discovery (for topology mapping)
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub neighbors: Vec<NeighborInfo>,
+    
+    // Vulnerability information
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vulnerabilities: Vec<VulnerabilityInfo>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub port_warnings: Vec<PortWarning>,
+    #[serde(default)]
+    pub security_grade: String,  // "A", "B", "C", "D", "F"
 }
 
 /// Information about a network neighbor (from LLDP/CDP)
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NeighborInfo {
     /// Local port name (e.g., "GigE0/1")
     pub local_port: String,
@@ -78,4 +87,23 @@ pub struct InterfaceInfo {
     pub mac: MacAddr,
     pub prefix_len: u8,
     pub pnet_interface: NetworkInterface,
+}
+
+/// CVE vulnerability information
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VulnerabilityInfo {
+    pub cve_id: String,
+    pub description: String,
+    pub severity: String,  // CRITICAL, HIGH, MEDIUM, LOW
+    pub cvss_score: Option<f32>,
+}
+
+/// Port-based security warning
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PortWarning {
+    pub port: u16,
+    pub service: String,
+    pub warning: String,
+    pub severity: String,  // CRITICAL, HIGH, MEDIUM, LOW
+    pub recommendation: Option<String>,
 }
