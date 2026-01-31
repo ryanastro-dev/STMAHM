@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -15,14 +15,16 @@ import { motion } from 'framer-motion';
 import { Loader2, WifiOff } from 'lucide-react';
 
 import DeviceNode from '../components/topology/DeviceNode';
+import CyberDeviceNode from '../components/topology/CyberDeviceNode';
+import MeshDeviceNode from '../components/topology/MeshDeviceNode';
+import TopologyControls, { MappingDesign } from '../components/topology/TopologyControls';
+import LiveTrafficMonitor from '../components/topology/LiveTrafficMonitor';
 import { useScanContext, HostInfo } from '../hooks/useScan';
 import { generateTopologyLayout } from '../lib/topology-layout';
+import { getMappingTheme } from '../lib/mapping-themes';
 import { useTheme } from '../hooks/useTheme';
 
-// Custom node types
-const nodeTypes = {
-  device: DeviceNode,
-};
+
 
 interface TopologyViewProps {
   onDeviceClick?: (device: HostInfo) => void;
@@ -32,6 +34,19 @@ export default function TopologyView({ onDeviceClick }: TopologyViewProps) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const { scanResult, isScanning, tauriAvailable } = useScanContext();
+
+  // Control panel state
+  const [isLocked, setIsLocked] = useState(() => {
+    const saved = localStorage.getItem('topology-locked');
+    return saved === 'true';
+  });
+  
+  const [mappingDesign, setMappingDesign] = useState<MappingDesign>(() => {
+    const saved = localStorage.getItem('topology-design') as MappingDesign;
+    if (saved === 'cyber' || saved === 'mesh') return saved;
+    return 'default';
+  });
+
 
   // Generate nodes and edges from real scan data
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
@@ -59,15 +74,43 @@ export default function TopologyView({ onDeviceClick }: TopologyViewProps) {
     }
   }, [onDeviceClick, scanResult]);
 
-  // Theme-aware colors - Professional for BOTH modes
-  const bgColor = isDark ? '#020617' : '#FFFFFF'; // Dark: slate-950, Light: pure white
-  const patternColor = isDark ? '#1E293B' : '#CBD5E1'; // More visible dots for light mode
-  const edgeColor = isDark ? '#3B82F6' : '#2563EB';
+  // Control panel handlers
+  const handleLockToggle = useCallback(() => {
+    setIsLocked(prev => {
+      const newValue = !prev;
+      localStorage.setItem('topology-locked', String(newValue));
+      return newValue;
+    });
+  }, []);
+
+  const handleDesignChange = useCallback((design: MappingDesign) => {
+    setMappingDesign(design);
+    localStorage.setItem('topology-design', design);
+  }, []);
+
+  // Get current theme configuration
+  const themeConfig = useMemo(() => getMappingTheme(mappingDesign, isDark), [mappingDesign, isDark, theme]);
+
+  // Dynamic node types based on theme
+  const nodeTypes = useMemo(() => {
+    const component = themeConfig.nodeComponent === 'cyber'
+      ? CyberDeviceNode
+      : themeConfig.nodeComponent === 'mesh'
+      ? MeshDeviceNode
+      : DeviceNode;
+    
+    return { device: component };
+  }, [themeConfig.nodeComponent]);
+
+  // Theme-aware colors
+  const bgColor = themeConfig.backgroundGradient || themeConfig.backgroundColor;
+  const edgeColor = themeConfig.edgeColor;
   const controlsBg = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)';
   const controlsBorder = isDark ? 'rgba(59, 130, 246, 0.3)' : 'rgba(148, 163, 184, 0.3)'; // Blue for dark, grey for light
   const controlsText = isDark ? '#F8FAFC' : '#0F172A';
 
-  // Enhanced edge styling with latency-based colors
+
+  // Enhanced edge styling with theme-based configuration
   const enhancedEdges: Edge[] = useMemo(() => {
     return edges.map(edge => {
       // Get latency from source node data (if available)
@@ -80,30 +123,30 @@ export default function TopologyView({ onDeviceClick }: TopologyViewProps) {
       else if (latency < 100) strokeColor = '#F59E0B'; // yellow
       else strokeColor = '#EF4444'; // red
 
+      // Apply mapping design theme (Cyber has glow effect)
+      const glowFilter = mappingDesign === 'cyber' 
+        ? 'drop-shadow(0 0 4px currentColor)'
+        : 'none';
+
       return {
         ...edge,
+        type: themeConfig.edgeStyle,
         animated: true,
         style: { 
           stroke: strokeColor, 
-          strokeWidth: 2,
-          opacity: isDark ? 0.8 : 0.6,
+          strokeWidth: themeConfig.edgeWidth,
+          opacity: themeConfig.edgeOpacity,
+          filter: glowFilter,
         },
       };
     });
-  }, [edges, nodes, edgeColor, isDark]);
+  }, [edges, nodes, edgeColor, mappingDesign, themeConfig]);
 
   // Empty state
   if (!scanResult && !isScanning) {
     return (
       <div className="h-full flex flex-col">
-        <motion.div 
-          className="p-6 border-b border-theme"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <h1 className="text-2xl font-bold text-text-primary">Network Topology</h1>
-          <p className="text-text-muted mt-1">No scan data available</p>
-        </motion.div>
+        {/* Empty state - takes remaining space */}
         <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: bgColor }}>
           <motion.div 
             className="text-center"
@@ -125,6 +168,13 @@ export default function TopologyView({ onDeviceClick }: TopologyViewProps) {
             </p>
           </motion.div>
         </div>
+
+        {/* Live Traffic Monitor */}
+        <LiveTrafficMonitor
+          visible={themeConfig.showTrafficMonitor}
+          isDark={isDark}
+          hasScanData={false}
+        />
       </div>
     );
   }
@@ -133,14 +183,7 @@ export default function TopologyView({ onDeviceClick }: TopologyViewProps) {
   if (isScanning) {
     return (
       <div className="h-full flex flex-col">
-        <motion.div 
-          className="p-6 border-b border-theme"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          <h1 className="text-2xl font-bold text-text-primary">Network Topology</h1>
-          <p className="text-text-muted mt-1">Scanning network...</p>
-        </motion.div>
+        {/* Loading state - takes remaining space */}
         <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: bgColor }}>
           <motion.div 
             className="text-center"
@@ -149,39 +192,42 @@ export default function TopologyView({ onDeviceClick }: TopologyViewProps) {
           >
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat:Infinity, ease: 'linear' }}
+              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
             >
               <Loader2 className="w-16 h-16 mx-auto mb-4 text-accent-blue" />
             </motion.div>
             <p className="text-text-muted text-lg">Discovering network topology...</p>
           </motion.div>
         </div>
+
+        {/* Live Traffic Monitor */}
+        <LiveTrafficMonitor
+          visible={themeConfig.showTrafficMonitor}
+          isDark={isDark}
+          hasScanData={false}
+        />
       </div>
     );
   }
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
+      {/* React Flow Canvas - takes remaining space */}
       <motion.div 
-        className="p-6 border-b border-theme"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <h1 className="text-2xl font-bold text-text-primary">Network Topology</h1>
-        <p className="text-text-muted mt-1">
-          Interactive network map • {nodes.length} devices • Click any device for details
-        </p>
-      </motion.div>
-
-      {/* React Flow Canvas */}
-      <motion.div 
-        className="flex-1" 
+        className="flex-1 relative" 
         style={{ backgroundColor: bgColor }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
       >
+        {/* Custom Control Panel */}
+        <TopologyControls
+          isLocked={isLocked}
+          onLockToggle={handleLockToggle}
+          mappingDesign={mappingDesign}
+          onDesignChange={handleDesignChange}
+        />
+        
         <ReactFlow
           nodes={nodes}
           edges={enhancedEdges}
@@ -189,6 +235,9 @@ export default function TopologyView({ onDeviceClick }: TopologyViewProps) {
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
           nodeTypes={nodeTypes}
+          nodesDraggable={!isLocked}
+          nodesConnectable={!isLocked}
+          elementsSelectable={!isLocked}
           fitView
           fitViewOptions={{ padding: 0.2 }}
           minZoom={0.2}
@@ -198,6 +247,8 @@ export default function TopologyView({ onDeviceClick }: TopologyViewProps) {
             animated: true,
           }}
           proOptions={{ hideAttribution: true }}
+          colorMode={isDark ? 'dark' : 'light'}
+          className={isDark ? 'dark' : ''}
           style={{
             backgroundColor: bgColor,
           }}
@@ -206,7 +257,7 @@ export default function TopologyView({ onDeviceClick }: TopologyViewProps) {
             variant={BackgroundVariant.Dots}
             gap={isDark ? 20 : 20}
             size={isDark ? 1.5 : 2}
-            color={patternColor}
+            color={themeConfig.patternColor}
           />
           <Controls
             style={{
@@ -222,6 +273,7 @@ export default function TopologyView({ onDeviceClick }: TopologyViewProps) {
             showInteractive={false}
           />
           <MiniMap
+            maskColor={isDark ? 'rgba(2, 6, 23, 0.9)' : 'rgba(248, 250, 252, 0.85)'}
             style={{
               backgroundColor: controlsBg,
               border: `1px solid ${controlsBorder}`,
@@ -240,24 +292,25 @@ export default function TopologyView({ onDeviceClick }: TopologyViewProps) {
                 FIREWALL: '#EF4444',
                 SERVER: '#F59E0B',
                 NAS: '#F59E0B',
-                PC: '#6B7280',
-                LAPTOP: '#6B7280',
+                LAPTOP: '#06B6D4',
+                PC: '#06B6D4',
                 MOBILE: '#EC4899',
-                TABLET: '#EC4899',
-                SMART_TV: '#14B8A6',
-                IOT_DEVICE: '#EF4444',
-                PRINTER: '#14B8A6',
-                CAMERA: '#F97316',
-                GAME_CONSOLE: '#8B5CF6',
+                PRINTER: '#6366F1',
               };
-              return colors[deviceType] || '#9CA3AF';
+              return colors[deviceType] || '#94A3B8';
             }}
-            maskColor={isDark ? 'rgba(2, 6, 23, 0.9)' : 'rgba(248, 250, 252, 0.85)'}
             pannable
             zoomable
           />
         </ReactFlow>
       </motion.div>
+
+      {/* Live Traffic Monitor */}
+      <LiveTrafficMonitor
+        visible={themeConfig.showTrafficMonitor}
+        isDark={isDark}
+        hasScanData={!!scanResult && scanResult.active_hosts.length > 0}
+      />
     </div>
   );
 }

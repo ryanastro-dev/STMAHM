@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
   Search,
-  Shield,
   Loader2,
-  CheckCircle,
-  XCircle,
   AlertCircle,
   Network,
   Play,
+  Hash,
+  Terminal,
 } from 'lucide-react';
 
 type Tab = 'ping' | 'portscan' | 'maclookup';
@@ -38,58 +38,60 @@ export default function Tools() {
   const [activeTab, setActiveTab] = useState<Tab>('ping');
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-text-primary mb-2">🛠️ Network Tools</h1>
-        <p className="text-text-muted">Essential network diagnostic and information utilities</p>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-white/10">
+    <div className="p-4">
+      {/* Tool Tabs */}
+      <div className="flex items-center gap-2 mb-4">
         <button
           onClick={() => setActiveTab('ping')}
-          className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors border-b-2 ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
             activeTab === 'ping'
-              ? 'text-accent-blue border-accent-blue'
-              : 'text-text-muted border-transparent hover:text-text-secondary'
+              ? 'bg-accent-purple text-white shadow-lg shadow-accent-purple/30'
+              : 'bg-bg-secondary text-text-secondary hover:text-text-primary hover:bg-bg-hover'
           }`}
         >
-          <Activity className="w-5 h-5" />
+          <Activity className="w-4 h-4" />
           Ping Tool
         </button>
 
         <button
           onClick={() => setActiveTab('portscan')}
-          className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors border-b-2 ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
             activeTab === 'portscan'
-              ? 'text-accent-blue border-accent-blue'
-              : 'text-text-muted border-transparent hover:text-text-secondary'
+              ? 'bg-accent-purple text-white shadow-lg shadow-accent-purple/30'
+              : 'bg-bg-secondary text-text-secondary hover:text-text-primary hover:bg-bg-hover'
           }`}
         >
-          <Shield className="w-5 h-5" />
+          <Hash className="w-4 h-4" />
           Port Scanner
         </button>
 
         <button
           onClick={() => setActiveTab('maclookup')}
-          className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors border-b-2 ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
             activeTab === 'maclookup'
-              ? 'text-accent-blue border-accent-blue'
-              : 'text-text-muted border-transparent hover:text-text-secondary'
+              ? 'bg-accent-purple text-white shadow-lg shadow-accent-purple/30'
+              : 'bg-bg-secondary text-text-secondary hover:text-text-primary hover:bg-bg-hover'
           }`}
         >
-          <Network className="w-5 h-5" />
+          <Network className="w-4 h-4" />
           MAC Lookup
         </button>
       </div>
 
       {/* Tool Content */}
-      <div className="card p-6">
-        {activeTab === 'ping' && <PingTool />}
-        {activeTab === 'portscan' && <PortScanTool />}
-        {activeTab === 'maclookup' && <MACLookupTool />}
-      </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+        >
+          {activeTab === 'ping' && <PingTool />}
+          {activeTab === 'portscan' && <PortScanTool />}
+          {activeTab === 'maclookup' && <MACLookupTool />}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
@@ -101,12 +103,14 @@ function PingTool() {
   const [count, setCount] = useState(4);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<PingResult[]>([]);
+  const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
 
   const handlePing = async () => {
     if (!target.trim()) return;
 
     setLoading(true);
     setResults([]);
+    setTerminalOutput(['$ ping ' + target.trim(), 'Sending ' + count + ' packets...', '']);
 
     try {
       const pingResults = await invoke<PingResult[]>('ping_host', {
@@ -114,9 +118,16 @@ function PingTool() {
         count,
       });
       setResults(pingResults);
+      
+      const output = pingResults.map((r) => 
+        r.success 
+          ? `Reply from ${target}: bytes=32 time=${r.latency_ms}ms TTL=${r.ttl}`
+          : `Request timed out`
+      );
+      setTerminalOutput(prev => [...prev, ...output, '', 'Ping statistics:', `Sent = ${count}, Received = ${pingResults.filter(r => r.success).length}`]);
     } catch (error) {
       console.error('Ping failed:', error);
-      alert(`Ping failed: ${error}`);
+      setTerminalOutput(prev => [...prev, `Error: ${error}`]);
     } finally {
       setLoading(false);
     }
@@ -127,121 +138,95 @@ function PingTool() {
     .reduce((sum, r) => sum + (r.latency_ms || 0), 0) / (successfulPings || 1);
 
   return (
-    <div className="space-y-6">
-      {/* Input */}
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
-            Target (IP or Hostname)
-          </label>
-          <input
-            type="text"
-            placeholder="e.g., 192.168.1.1 or google.com"
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handlePing()}
-            className="w-full px-4 py-2.5 bg-bg-tertiary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
-          />
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {/* Configuration */}
+      <div className="bg-bg-secondary border border-theme rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Activity className="w-4 h-4 text-accent-purple" />
+          <h2 className="text-sm font-bold text-text-primary">Configuration</h2>
         </div>
 
-        <div className="flex gap-4 items-end">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Ping Count
-            </label>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-bold text-text-secondary mb-1.5 uppercase">Target Host</label>
+            <input
+              type="text"
+              placeholder="e.g. google.com"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handlePing()}
+              className="w-full px-3 py-2 bg-bg-tertiary border border-theme rounded text-sm text-text-primary focus:outline-none focus:border-accent-purple transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-text-secondary mb-1.5 uppercase">Packet Count</label>
             <select
               value={count}
               onChange={(e) => setCount(Number(e.target.value))}
-              className="w-full px-4 py-2.5 bg-bg-tertiary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
+              className="w-full px-3 py-2 bg-bg-tertiary border border-theme rounded text-sm text-text-primary focus:outline-none focus:border-accent-purple transition-colors"
             >
-              <option value={1}>1 ping</option>
-              <option value={4}>4 pings</option>
-              <option value={10}>10 pings</option>
-              <option value={20}>20 pings</option>
+              <option value={4}>4 packets (Default)</option>
+              <option value={1}>1 packet</option>
+              <option value={10}>10 packets</option>
             </select>
           </div>
 
           <button
             onClick={handlePing}
             disabled={loading || !target.trim()}
-            className="flex items-center gap-2 px-6 py-2.5 bg-accent-blue hover:bg-accent-blue/80 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-accent-purple to-indigo-600 hover:from-accent-purple/90 hover:to-indigo-600/90 text-white rounded font-bold text-sm shadow-lg shadow-accent-purple/30 transition-all disabled:opacity-50"
           >
-            {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Pinging...
-              </>
-            ) : (
-              <>
-                <Play className="w-5 h-5" />
-                Start Ping
-              </>
-            )}
+            {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Pinging...</> : <><Play className="w-4 h-4" />Start Ping</>}
           </button>
         </div>
       </div>
 
-      {/* Results */}
-      {results.length > 0 && (
-        <div className="space-y-4">
-          {/* Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-bg-tertiary rounded-lg p-4">
-              <p className="text-sm text-text-muted mb-1">Sent</p>
-              <p className="text-2xl font-bold text-text-primary">{results.length}</p>
-            </div>
-            <div className="bg-bg-tertiary rounded-lg p-4">
-              <p className="text-sm text-text-muted mb-1">Received</p>
-              <p className="text-2xl font-bold text-accent-green">{successfulPings}</p>
-            </div>
-            <div className="bg-bg-tertiary rounded-lg p-4">
-              <p className="text-sm text-text-muted mb-1">Lost</p>
-              <p className="text-2xl font-bold text-accent-red">{results.length - successfulPings}</p>
-            </div>
-            <div className="bg-bg-tertiary rounded-lg p-4">
-              <p className="text-sm text-text-muted mb-1">Avg Latency</p>
-              <p className="text-2xl font-bold text-accent-blue">{avgLatency.toFixed(1)}ms</p>
+      {/* Terminal & Results */}
+      <div className="space-y-3">
+        <div className="bg-slate-900 border border-slate-700 rounded overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 bg-slate-800 border-b border-slate-700">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-3.5 h-3.5 text-green-400" />
+              <h3 className="font-bold text-white text-xs">Output</h3>
             </div>
           </div>
-
-          {/* OS Detection */}
-          {results[0]?.os_guess && (
-            <div className="bg-accent-blue/10 border border-accent-blue/30 rounded-lg p-4">
-              <p className="text-sm text-text-muted mb-1">Detected OS (from TTL)</p>
-              <p className="text-lg font-semibold text-accent-blue">{results[0].os_guess}</p>
-            </div>
-          )}
-
-          {/* Individual Results */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-text-secondary">Individual Pings:</h3>
-            {results.map((result, i) => (
-              <div
-                key={i}
-                className={`flex items-center justify-between p-3 rounded-lg ${
-                  result.success ? 'bg-accent-green/10' : 'bg-accent-red/10'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {result.success ? (
-                    <CheckCircle className="w-5 h-5 text-accent-green" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-accent-red" />
-                  )}
-                  <span className="text-text-primary">Ping #{i + 1}</span>
-                </div>
-                <div className="text-text-secondary">
-                  {result.success ? (
-                    <span>{result.latency_ms?.toFixed(2)}ms (TTL: {result.ttl})</span>
-                  ) : (
-                    <span className="text-accent-red">{result.error || 'Failed'}</span>
-                  )}
-                </div>
+          <div className="p-3 font-mono text-xs text-green-400 h-48 overflow-y-auto">
+            {terminalOutput.length <= 3 && !loading ? (
+              <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                <Terminal className="w-10 h-10 mb-2 opacity-20" />
+                <p className="text-xs">Ready...</p>
               </div>
-            ))}
+            ) : (
+              <>
+                {terminalOutput.map((line, i) => <div key={i}>{line || <br />}</div>)}
+                {loading && <div className="flex items-center gap-1 mt-1"><div className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></div>Processing...</div>}
+              </>
+            )}
           </div>
         </div>
-      )}
+
+        {results.length > 0 && (
+          <div className="grid grid-cols-4 gap-2">
+            <div className="bg-bg-secondary border border-theme rounded p-2">
+              <p className="text-xs text-text-muted uppercase font-semibold">Sent</p>
+              <p className="text-xl font-bold text-text-primary">{results.length}</p>
+            </div>
+            <div className="bg-bg-secondary border border-theme rounded p-2">
+              <p className="text-xs text-text-muted uppercase font-semibold">Got</p>
+              <p className="text-xl font-bold text-accent-green">{successfulPings}</p>
+            </div>
+            <div className="bg-bg-secondary border border-theme rounded p-2">
+              <p className="text-xs text-text-muted uppercase font-semibold">Lost</p>
+              <p className="text-xl font-bold text-accent-red">{results.length - successfulPings}</p>
+            </div>
+            <div className="bg-bg-secondary border border-theme rounded p-2">
+              <p className="text-xs text-text-muted uppercase font-semibold">Avg</p>
+              <p className="text-xl font-bold text-accent-blue">{avgLatency.toFixed(1)}ms</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -250,167 +235,99 @@ function PingTool() {
 
 function PortScanTool() {
   const [target, setTarget] = useState('');
-  const [portInput, setPortInput] = useState('22,80,443,445,3389,8080');
+  const [startPort, setStartPort] = useState('1');
+  const [endPort, setEndPort] = useState('1000');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<PortScanResult[]>([]);
 
-  const presets = {
-    common: '21,22,23,80,443,445,3389,8080',
-    web: '80,443,8000,8080,8443',
-    database: '1433,3306,5432,27017',
-    all: '20,21,22,23,25,53,80,110,143,443,445,3306,3389,5432,8080',
-  };
-
   const handleScan = async () => {
-    if (!target.trim() || !portInput.trim()) return;
+    if (!target.trim()) return;
+    const start = parseInt(startPort);
+    const end = parseInt(endPort);
+    if (isNaN(start) || isNaN(end)) return;
 
     setLoading(true);
     setResults([]);
 
     try {
-      const ports = portInput.split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p));
-      const scanResults = await invoke<PortScanResult[]>('scan_ports', {
-        target: target.trim(),
-        ports,
-      });
+      const ports = Array.from({ length: Math.min(end - start + 1, 100) }, (_, i) => start + i);
+      const scanResults = await invoke<PortScanResult[]>('scan_ports', { target: target.trim(), ports });
       setResults(scanResults);
     } catch (error) {
-      console.error('Port scan failed:', error);
-      alert(`Port scan failed: ${error}`);
+      console.error('Scan failed:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const openPorts = results.filter(r => r.is_open).length;
+  const openPorts = results.filter(r => r.is_open);
 
   return (
-    <div className="space-y-6">
-      {/* Input */}
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
-            Target (IP or Hostname)
-          </label>
-          <input
-            type="text"
-            placeholder="e.g., 192.168.1.1"
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            className="w-full px-4 py-2.5 bg-bg-tertiary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
-          />
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="bg-bg-secondary border border-theme rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Hash className="w-4 h-4 text-accent-purple" />
+          <h2 className="text-sm font-bold text-text-primary">Configuration</h2>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
-            Ports (comma-separated)
-          </label>
-          <input
-            type="text"
-            placeholder="e.g., 22,80,443"
-            value={portInput}
-            onChange={(e) => setPortInput(e.target.value)}
-            className="w-full px-4 py-2.5 bg-bg-tertiary border border-white/10 rounded-lg text-text-primary font-mono focus:outline-none focus:border-accent-blue transition-colors"
-          />
-        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-bold text-text-secondary mb-1.5 uppercase">Target IP</label>
+            <input
+              type="text"
+              placeholder="192.168.1.1"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              className="w-full px-3 py-2 bg-bg-tertiary border border-theme rounded text-sm text-text-primary focus:outline-none focus:border-accent-purple"
+            />
+          </div>
 
-        {/* Presets */}
-        <div className="flex flex-wrap gap-2">
-          <span className="text-sm text-text-muted self-center">Quick presets:</span>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-bold text-text-secondary mb-1.5 uppercase">Start Port</label>
+              <input
+                type="number"
+                value={startPort}
+                onChange={(e) => setStartPort(e.target.value)}
+                className="w-full px-3 py-2 bg-bg-tertiary border border-theme rounded text-sm text-text-primary focus:outline-none focus:border-accent-purple"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-text-secondary mb-1.5 uppercase">End Port</label>
+              <input
+                type="number"
+                value={endPort}
+                onChange={(e) => setEndPort(e.target.value)}
+                className="w-full px-3 py-2 bg-bg-tertiary border border-theme rounded text-sm text-text-primary focus:outline-none focus:border-accent-purple"
+              />
+            </div>
+          </div>
+
           <button
-            onClick={() => setPortInput(presets.common)}
-            className="px-3 py-1 text-xs bg-bg-tertiary hover:bg-bg-hover text-text-secondary rounded transition-colors"
+            onClick={handleScan}
+            disabled={loading || !target.trim()}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-accent-purple to-indigo-600 text-white rounded font-bold text-sm shadow-lg shadow-accent-purple/30 transition-all disabled:opacity-50"
           >
-            Common
-          </button>
-          <button
-            onClick={() => setPortInput(presets.web)}
-            className="px-3 py-1 text-xs bg-bg-tertiary hover:bg-bg-hover text-text-secondary rounded transition-colors"
-          >
-            Web
-          </button>
-          <button
-            onClick={() => setPortInput(presets.database)}
-            className="px-3 py-1 text-xs bg-bg-tertiary hover:bg-bg-hover text-text-secondary rounded transition-colors"
-          >
-            Database
-          </button>
-          <button
-            onClick={() => setPortInput(presets.all)}
-            className="px-3 py-1 text-xs bg-bg-tertiary hover:bg-bg-hover text-text-secondary rounded transition-colors"
-          >
-            All Common
+            {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Scanning...</> : <><Play className="w-4 h-4" />Start Scan</>}
           </button>
         </div>
-
-        <button
-          onClick={handleScan}
-          disabled={loading || !target.trim() || !portInput.trim()}
-          className="w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-accent-blue hover:bg-accent-blue/80 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Scanning...
-            </>
-          ) : (
-            <>
-              <Search className="w-5 h-5" />
-              Start Scan
-            </>
-          )}
-        </button>
       </div>
 
-      {/* Results */}
-      {results.length > 0 && (
-        <div className="space-y-4">
-          {/* Summary */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-bg-tertiary rounded-lg p-4">
-              <p className="text-sm text-text-muted mb-1">Ports Scanned</p>
-              <p className="text-2xl font-bold text-text-primary">{results.length}</p>
+      <div className="bg-bg-secondary border border-theme rounded-lg p-4">
+        <h3 className="text-xs font-bold text-text-secondary uppercase mb-2">Results {openPorts.length > 0 && `(${openPorts.length} open)`}</h3>
+        <div className="h-56 overflow-y-auto space-y-1">
+          {openPorts.length === 0 && !loading && (
+            <div className="flex items-center justify-center h-full text-text-muted text-xs">No open ports found</div>
+          )}
+          {openPorts.map((r) => (
+            <div key={r.port} className="flex items-center justify-between p-2 bg-accent-green/10 border border-accent-green/30 rounded text-xs">
+              <span className="font-mono font-bold text-accent-green">Port {r.port}</span>
+              <span className="text-accent-green">{r.service || 'Unknown'}</span>
             </div>
-            <div className="bg-bg-tertiary rounded-lg p-4">
-              <p className="text-sm text-text-muted mb-1">Open Ports</p>
-              <p className="text-2xl font-bold text-accent-green">{openPorts}</p>
-            </div>
-          </div>
-
-          {/* Port List */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-text-secondary">Scan Results:</h3>
-            <div className="space-y-1">
-              {results.filter(r => r.is_open).map((result) => (
-                <div
-                  key={result.port}
-                  className="flex items-center justify-between p-3 rounded-lg bg-accent-green/10 border border-accent-green/30"
-                >
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-accent-green" />
-                    <span className="font-mono text-text-primary">Port {result.port}</span>
-                  </div>
-                  <span className="text-accent-green font-medium">
-                    {result.service || 'Unknown'} - OPEN
-                  </span>
-                </div>
-              ))}
-              {results.filter(r => !r.is_open).map((result) => (
-                <div
-                  key={result.port}
-                  className="flex items-center justify-between p-3 rounded-lg bg-bg-tertiary"
-                >
-                  <div className="flex items-center gap-3">
-                    <XCircle className="w-5 h-5 text-text-muted" />
-                    <span className="font-mono text-text-muted">Port {result.port}</span>
-                  </div>
-                  <span className="text-text-muted">Closed</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
+          {loading && <div className="text-center text-text-muted text-xs py-4">Scanning...</div>}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -424,118 +341,77 @@ function MACLookupTool() {
 
   const handleLookup = async () => {
     if (!mac.trim()) return;
-
     setLoading(true);
     setResult(null);
 
     try {
-      const lookupResult = await invoke<VendorLookupResult>('lookup_mac_vendor', {
-        mac: mac.trim(),
-      });
+      const lookupResult = await invoke<VendorLookupResult>('lookup_mac_vendor', { mac: mac.trim() });
       setResult(lookupResult);
     } catch (error) {
       console.error('Lookup failed:', error);
-      alert(`Lookup failed: ${error}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Input */}
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
-            MAC Address
-          </label>
-          <input
-            type="text"
-            placeholder="e.g., 00:1C:B3:00:00:00 or 5a:05:d7:51:07:81"
-            value={mac}
-            onChange={(e) => setMac(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleLookup()}
-            className="w-full px-4 py-2.5 bg-bg-tertiary border border-white/10 rounded-lg text-text-primary font-mono focus:outline-none focus:border-accent-blue transition-colors"
-          />
-          <p className="text-xs text-text-muted mt-1">
-            Format: XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX
-          </p>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="bg-bg-secondary border border-theme rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Network className="w-4 h-4 text-accent-purple" />
+          <h2 className="text-sm font-bold text-text-primary">Configuration</h2>
         </div>
 
-        <button
-          onClick={handleLookup}
-          disabled={loading || !mac.trim()}
-          className="w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-accent-blue hover:bg-accent-blue/80 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Looking up...
-            </>
-          ) : (
-            <>
-              <Search className="w-5 h-5" />
-              Lookup Vendor
-            </>
-          )}
-        </button>
-      </div>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-bold text-text-secondary mb-1.5 uppercase">MAC Address</label>
+            <input
+              type="text"
+              placeholder="00:1C:B3:00:00:00"
+              value={mac}
+              onChange={(e) => setMac(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleLookup()}
+              className="w-full px-3 py-2 bg-bg-tertiary border border-theme rounded text-sm font-mono text-text-primary focus:outline-none focus:border-accent-purple"
+            />
+          </div>
 
-      {/* Result */}
-      {result && (
-        <div className="space-y-4">
-          <div className="bg-bg-tertiary rounded-lg p-6 space-y-4">
-            <div>
-              <p className="text-sm text-text-muted mb-1">MAC Address</p>
-              <p className="text-lg font-mono text-text-primary">{result.mac}</p>
-            </div>
+          <button
+            onClick={handleLookup}
+            disabled={loading || !mac.trim()}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-accent-purple to-indigo-600 text-white rounded font-bold text-sm shadow-lg shadow-accent-purple/30 transition-all disabled:opacity-50"
+          >
+            {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Looking up...</> : <><Search className="w-4 h-4" />Lookup</>}
+          </button>
 
-            {result.is_randomized ? (
-              <div className="bg-accent-amber/10 border border-accent-amber/30 rounded-lg p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-accent-amber flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-accent-amber mb-1">Randomized MAC Address</p>
-                  <p className="text-sm text-text-secondary">
-                    This is a locally administered (randomized/virtual) MAC address, typically used
-                    by mobile devices for privacy protection.
-                  </p>
-                </div>
-              </div>
-            ) : result.vendor ? (
-              <div className="bg-accent-green/10 border border-accent-green/30 rounded-lg p-4">
-                <p className="text-sm text-text-muted mb-1">Manufacturer/Vendor</p>
-                <p className="text-xl font-semibold text-accent-green">{result.vendor}</p>
-              </div>
-            ) : (
-              <div className="bg-accent-red/10 border border-accent-red/30 rounded-lg p-4">
-                <p className="text-sm text-text-muted mb-1">Vendor</p>
-                <p className="text-lg text-accent-red">Unknown</p>
-                <p className="text-sm text-text-secondary mt-2">
-                  MAC address not found in OUI database
-                </p>
-              </div>
-            )}
+          <div className="text-xs text-text-muted">
+            <p className="font-semibold mb-1">Examples:</p>
+            <button onClick={() => setMac('34:4a:c3:22:6f:90')} className="block w-full text-left p-1.5 bg-bg-tertiary hover:bg-bg-hover rounded font-mono">34:4a:c3:22:6f:90</button>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Examples */}
-      <div className="bg-bg-tertiary rounded-lg p-4">
-        <h4 className="text-sm font-medium text-text-secondary mb-3">Try these examples:</h4>
-        <div className="space-y-2">
-          <button
-            onClick={() => setMac('34:4a:c3:22:6f:90')}
-            className="w-full text-left px-3 py-2 bg-bg-primary hover:bg-bg-hover rounded text-sm text-text-primary font-mono transition-colors"
-          >
-            34:4a:c3:22:6f:90 (TP-Link)
-          </button>
-          <button
-            onClick={() => setMac('5a:05:d7:51:07:81')}
-            className="w-full text-left px-3 py-2 bg-bg-primary hover:bg-bg-hover rounded text-sm text-text-primary font-mono transition-colors"
-          >
-            5a:05:d7:51:07:81 (Randomized MAC)
-          </button>
-        </div>
+      <div className="bg-bg-secondary border border-theme rounded-lg p-4">
+        <h3 className="text-xs font-bold text-text-secondary uppercase mb-2">Vendor Information</h3>
+        {!result ? (
+          <div className="flex items-center justify-center h-32 text-text-muted text-xs">Enter MAC to lookup</div>
+        ) : result.is_randomized ? (
+          <div className="bg-accent-amber/10 border border-accent-amber/30 rounded p-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-accent-amber shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-accent-amber text-sm mb-1">Randomized MAC</p>
+                <p className="text-xs text-text-secondary">This is a locally administered MAC address used for privacy.</p>
+              </div>
+            </div>
+          </div>
+        ) : result.vendor ? (
+          <div className="bg-accent-green/10 border border-accent-green/30 rounded p-4">
+            <p className="text-xs text-text-muted mb-1 uppercase">Vendor</p>
+            <p className="text-lg font-bold text-accent-green">{result.vendor}</p>
+          </div>
+        ) : (
+          <div className="bg-accent-red/10 border border-accent-red/30 rounded p-3 text-xs text-accent-red">Vendor not found</div>
+        )}
       </div>
     </div>
   );

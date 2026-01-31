@@ -1,26 +1,21 @@
-/**
- * Reports Page - Export Center
- * 
- * Centralized dashboard for all export functionality
- */
-
 import { useState } from 'react';
-import { FileDown, FileText, FileJson, FileSpreadsheet, Shield, Network } from 'lucide-react';
+import { FileDown, FileText, FileSpreadsheet, Shield, Network, BarChart3, Database } from 'lucide-react';
 import { useScanContext } from '../hooks/useScan';
 import { useExport } from '../hooks/useExport';
-import Button from '../components/common/Button';
 
 interface ExportCardProps {
   title: string;
   description: string;
   icon: React.ReactNode;
   format: string;
+  formatColor: string;
+  bgColor: string;
   onExport: () => void | Promise<void>;
   isLoading?: boolean;
   disabled?: boolean;
 }
 
-function ExportCard({ title, description, icon, format, onExport, isLoading, disabled }: ExportCardProps) {
+function ExportCard({ title, description, icon, format, formatColor, bgColor, onExport, isLoading, disabled }: ExportCardProps) {
   const [loading, setLoading] = useState(false);
 
   const handleExport = async () => {
@@ -33,38 +28,40 @@ function ExportCard({ title, description, icon, format, onExport, isLoading, dis
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
-      <div className="flex items-start gap-4">
-        <div className="p-3 bg-primary/10 rounded-lg text-primary">
+    <div className={`${bgColor} border border-theme rounded-xl p-6 transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'}`}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl">
           {icon}
         </div>
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-text-primary mb-1">{title}</h3>
-          <p className="text-sm text-text-muted mb-4">{description}</p>
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-text-muted px-2 py-1 bg-bg-secondary rounded">
-              {format}
-            </span>
-            <Button
-              onClick={handleExport}
-              disabled={disabled || loading || isLoading}
-              className="ml-auto"
-            >
-              {loading || isLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <FileDown className="w-4 h-4 mr-2" />
-                  Export
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
+        <span className={`text-xs font-bold px-3 py-1 rounded-full ${formatColor}`}>
+          {format}
+        </span>
       </div>
+
+      <h3 className="text-lg font-bold text-text-primary mb-2">{title}</h3>
+      <p className="text-sm text-text-secondary mb-6 leading-relaxed">{description}</p>
+
+      <button
+        onClick={handleExport}
+        disabled={disabled || loading || isLoading}
+        className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm shadow-lg transition-all ${
+          disabled 
+            ? 'bg-gray-400 cursor-not-allowed' 
+            : 'bg-gradient-to-r from-accent-purple to-indigo-600 hover:from-accent-purple/90 hover:to-indigo-600/90 text-white shadow-accent-purple/30'
+        }`}
+      >
+        {loading || isLoading ? (
+          <>
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            Exporting...
+          </>
+        ) : (
+          <>
+            <FileDown className="w-4 h-4" />
+            Export
+          </>
+        )}
+      </button>
     </div>
   );
 }
@@ -85,42 +82,31 @@ export default function Reports() {
   const hasData = scanResult && scanResult.active_hosts && scanResult.active_hosts.length > 0;
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-text-primary mb-2">
-          📊 Reports & Export
-        </h1>
-        <p className="text-text-muted">
-          Generate professional reports and export network data in various formats
-        </p>
-      </div>
-
-      {/* Status Message */}
-      {!hasData && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6">
-          <p className="text-yellow-700 dark:text-yellow-300">
-            ⚠️ No scan data available. Please run a network scan first to generate reports.
-          </p>
-        </div>
-      )}
-
+    <div className="p-4">
+      {/* Error Alert */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
-          <p className="text-red-700 dark:text-red-300">
-            ❌ Error: {error}
-          </p>
+        <div className="bg-accent-red/10 border border-accent-red/30 rounded-lg p-3 mb-4">
+          <p className="text-accent-red text-sm">❌ Error: {error}</p>
         </div>
       )}
 
-      {/* Export Cards Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Scan Report PDF */}
+      {/* No Data Warning */}
+      {!hasData && (
+        <div className="bg-accent-amber/10 border border-accent-amber/30 rounded-lg p-3 mb-4">
+          <p className="text-accent-amber text-sm">⚠️ No scan data available. Run a network scan first.</p>
+        </div>
+      )}
+
+      {/* Export Cards Grid - Responsive */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Scan Report PDF - Red/Pink theme */}
         <ExportCard
           title="Scan Report"
-          description="Professional PDF report with network analysis, device inventory, and statistics"
-          icon={<FileText className="w-6 h-6" />}
+          description="Professional PDF report with network analysis, device inventory, and statistics."
+          icon={<FileText className="w-6 h-6 text-accent-red" />}
           format="PDF"
+          formatColor="bg-accent-red/20 text-accent-red"
+          bgColor="bg-gradient-to-br from-accent-red/5 to-accent-red/10"
           onExport={async () => {
             if (scanResult) {
               await exportScanReportPDF(scanResult, scanResult.active_hosts);
@@ -130,23 +116,14 @@ export default function Reports() {
           disabled={!hasData}
         />
 
-        {/* Device List CSV */}
-        <ExportCard
-          title="Device List"
-          description="Export all discovered devices to CSV format for spreadsheet analysis"
-          icon={<FileSpreadsheet className="w-6 h-6" />}
-          format="CSV"
-          onExport={exportDevicesCSV}
-          isLoading={exportingType === 'devices-csv'}
-          disabled={!hasData}
-        />
-
-        {/* Security Report PDF */}
+        {/* Security Report PDF - Red theme */}
         <ExportCard
           title="Security Report"
-          description="Network health assessment with security recommendations and risk analysis"
-          icon={<Shield className="w-6 h-6" />}
+          description="Network health assessment with security recommendations and risk analysis."
+          icon={<Shield className="w-6 h-6 text-accent-red" />}
           format="PDF"
+          formatColor="bg-accent-red/20 text-accent-red"
+          bgColor="bg-gradient-to-br from-accent-red/5 to-accent-red/10"
           onExport={async () => {
             if (scanResult && scanResult.active_hosts) {
               await exportSecurityReportPDF(scanResult.active_hosts);
@@ -156,27 +133,27 @@ export default function Reports() {
           disabled={!hasData}
         />
 
-        {/* Topology Data JSON */}
+        {/* Device List CSV - Green theme */}
         <ExportCard
-          title="Topology Data"
-          description="Export network topology structure as JSON for custom visualization or analysis"
-          icon={<Network className="w-6 h-6" />}
-          format="JSON"
-          onExport={async () => {
-            if (scanResult && scanResult.active_hosts) {
-              await exportTopologyJSON(scanResult.active_hosts, scanResult.subnet);
-            }
-          }}
-          isLoading={exportingType === 'topology-json'}
+          title="Device List"
+          description="Export all discovered devices to CSV format for spreadsheet analysis."
+          icon={<FileSpreadsheet className="w-6 h-6 text-accent-green" />}
+          format="CSV"
+          formatColor="bg-accent-green/20 text-accent-green"
+          bgColor="bg-gradient-to-br from-accent-green/5 to-accent-green/10"
+          onExport={exportDevicesCSV}
+          isLoading={exportingType === 'devices-csv'}
           disabled={!hasData}
         />
 
-        {/* Scan Results CSV */}
+        {/* Scan Results CSV - Green theme */}
         <ExportCard
           title="Scan Results"
-          description="Export current scan results to CSV with all device details and metrics"
-          icon={<FileSpreadsheet className="w-6 h-6" />}
+          description="Export current scan results to CSV with all device details and metrics."
+          icon={<BarChart3 className="w-6 h-6 text-accent-green" />}
           format="CSV"
+          formatColor="bg-accent-green/20 text-accent-green"
+          bgColor="bg-gradient-to-br from-accent-green/5 to-accent-green/10"
           onExport={async () => {
             if (scanResult && scanResult.active_hosts) {
               await exportScanCSV(scanResult.active_hosts);
@@ -186,12 +163,31 @@ export default function Reports() {
           disabled={!hasData}
         />
 
-        {/* Raw Scan Data JSON */}
+        {/* Topology Data JSON - Orange theme */}
+        <ExportCard
+          title="Topology Data"
+          description="Export network topology structure as JSON for custom visualization or analysis."
+          icon={<Network className="w-6 h-6 text-accent-amber" />}
+          format="JSON"
+          formatColor="bg-accent-amber/20 text-accent-amber"
+          bgColor="bg-gradient-to-br from-accent-amber/5 to-accent-amber/10"
+          onExport={async () => {
+            if (scanResult && scanResult.active_hosts) {
+              await exportTopologyJSON(scanResult.active_hosts, scanResult.subnet);
+            }
+          }}
+          isLoading={exportingType === 'topology-json'}
+          disabled={!hasData}
+        />
+
+        {/* Raw Scan Data JSON - Orange theme */}
         <ExportCard
           title="Raw Scan Data"
-          description="Export complete scan result with all metadata in JSON format"
-          icon={<FileJson className="w-6 h-6" />}
+          description="Export complete scan result with all metadata in JSON format."
+          icon={<Database className="w-6 h-6 text-accent-amber" />}
           format="JSON"
+          formatColor="bg-accent-amber/20 text-accent-amber"
+          bgColor="bg-gradient-to-br from-accent-amber/5 to-accent-amber/10"
           onExport={async () => {
             if (scanResult) {
               await exportScanJSON(scanResult);
@@ -201,21 +197,6 @@ export default function Reports() {
           disabled={!hasData}
         />
       </div>
-
-      {/* Quick Actions (if needed) */}
-      {hasData && (
-        <div className="mt-8 p-6 bg-bg-secondary rounded-lg border border-border">
-          <h2 className="text-lg font-semibold text-text-primary mb-3">
-            📌 Quick Tips
-          </h2>
-          <ul className="space-y-2 text-sm text-text-muted">
-            <li>• PDF reports are ideal for documentation and presentations</li>
-            <li>• CSV files can be opened in Excel or Google Sheets for analysis</li>
-            <li>• JSON exports preserve full data structure for programmatic use</li>
-            <li>• Security reports include actionable recommendations</li>
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { motion } from 'framer-motion';
 import {
@@ -269,4 +268,4 @@ function DeviceNode({ data, selected }: NodeProps) {
   );
 }
 
-export default memo(DeviceNode);
+export default DeviceNode;

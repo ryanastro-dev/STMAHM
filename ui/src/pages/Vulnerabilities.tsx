@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useScanContext } from '../hooks/useScan';
 import { Shield, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
+
 
 interface VulnerabilityInfo {
   cve_id: string;
@@ -37,11 +39,9 @@ export default function Vulnerabilities() {
   const [filter, setFilter] = useState<'all' | 'critical' | 'high' | 'medium'>('all');
 
   useEffect(() => {
-    // Use scan result data directly (real-time!)
     if (scanResult && scanResult.active_hosts) {
-      // Map HostInfo to DeviceWithVulns format
       const devicesWithVulns = scanResult.active_hosts.map(host => ({
-        id: 0, // Not needed for display
+        id: 0,
         mac: host.mac,
         last_ip: host.ip,
         vendor: host.vendor,
@@ -79,17 +79,9 @@ export default function Vulnerabilities() {
   });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Vulnerabilities</h1>
-        <p className="text-muted-foreground">
-          Security assessment and vulnerability tracking for network devices
-        </p>
-      </div>
-
+    <div className="p-6 lg:p-8">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <SummaryCard
           title="Critical"
           count={stats.critical}
@@ -126,14 +118,23 @@ export default function Vulnerabilities() {
 
       {/* Device Security Cards */}
       {filteredDevices.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Shield className="w-16 h-16 mx-auto mb-4 opacity-50" />
-          <p>{scanResult ? `No devices found${filter !== 'all' ? ' for this filter' : ''}` : 'Run a scan to see device vulnerabilities'}</p>
+        <div className="text-center py-16">
+          <Shield className="w-16 h-16 mx-auto mb-4 text-text-muted opacity-50" />
+          <p className="text-text-muted">
+            {scanResult ? `No devices found${filter !== 'all' ? ' for this filter' : ''}` : 'Run a scan to see device vulnerabilities'}
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filteredDevices.map(device => (
-            <SecurityCard key={device.mac} device={device} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filteredDevices.map((device, index) => (
+            <motion.div
+              key={device.mac}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+            >
+              <SecurityCard device={device} />
+            </motion.div>
           ))}
         </div>
       )}
@@ -153,154 +154,167 @@ interface SummaryCardProps {
 
 function SummaryCard({ title, count, icon, color, onClick, active }: SummaryCardProps) {
   const colorClasses = {
-    red: 'bg-red-500/10 text-red-500 border-red-500/20',
-    orange: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
-    yellow: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-    green: 'bg-green-500/10 text-green-500 border-green-500/20',
+    red: 'bg-accent-red/10 text-accent-red border-accent-red/20 hover:bg-accent-red/15',
+    orange: 'bg-accent-amber/10 text-accent-amber border-accent-amber/20 hover:bg-accent-amber/15',
+    yellow: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/15',
+    green: 'bg-accent-green/10 text-accent-green border-accent-green/20 hover:bg-accent-green/15',
   };
 
   return (
-    <button
+    <motion.button
       onClick={onClick}
-      className={`p-6 rounded-lg border-2 transition-all ${
-        active ? 'ring-2 ring-primary' : ''
-      } ${colorClasses[color]} hover:scale-105`}
+      className={`p-6 rounded-xl border-2 transition-all bg-bg-secondary ${
+        active ? 'ring-2 ring-accent-blue' : ''
+      } ${colorClasses[color]}`}
+      whileHover={{ scale: 1.02, y: -2 }}
+      whileTap={{ scale: 0.98 }}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium opacity-80">{title}</span>
+        <span className="text-sm font-semibold opacity-80">{title}</span>
         {icon}
       </div>
       <div className="text-3xl font-bold">{count}</div>
-    </button>
+    </motion.button>
   );
 }
 
-// Security Card Component
+// Security Card Component - Redesigned to match screenshot
 interface SecurityCardProps {
   device: DeviceWithVulns;
 }
 
 function SecurityCard({ device }: SecurityCardProps) {
   const gradeColors = {
-    'A': 'text-green-500 bg-green-500/10',
-    'B': 'text-blue-500 bg-blue-500/10',
-    'C': 'text-yellow-500 bg-yellow-500/10',
-    'D': 'text-orange-500 bg-orange-500/10',
-    'F': 'text-red-500 bg-red-500/10',
+    'A': 'text-accent-green bg-accent-green/10',
+    'B': 'text-accent-blue bg-accent-blue/10',
+    'C': 'text-yellow-600 dark:text-yellow-500 bg-yellow-500/10',
+    'D': 'text-accent-amber bg-accent-amber/10',
+    'F': 'text-accent-red bg-accent-red/10',
   };
 
   const grade = device.security_grade || 'N/A';
-  const gradeClass = gradeColors[grade as keyof typeof gradeColors] || 'text-gray-500 bg-gray-500/10';
+  const gradeClass = gradeColors[grade as keyof typeof gradeColors] || 'text-text-muted bg-bg-tertiary';
+  
+  const hasVulns = device.vulnerabilities && device.vulnerabilities.length > 0;
+  const hasWarnings = device.port_warnings && device.port_warnings.length > 0;
+  const isSecure = !hasVulns && !hasWarnings;
 
   return (
-    <div className="card p-4">
+    <div className="bg-bg-secondary border border-theme rounded-2xl p-6 hover:border-accent-blue/30 transition-all">
       {/* Device Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex-1">
-          <h3 className="text-base font-semibold">
-            {device.custom_name || device.hostname || device.last_ip}
+      <div className="flex items-start justify-between mb-6">  
+        <div className="flex-1 min-w-0">
+          <h3 className="text-2xl font-bold text-text-primary mb-1">
+            {device.last_ip}
           </h3>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-            <span>{device.vendor || 'Unknown Vendor'}</span>
+          <p className="text-text-muted text-sm">
+            {device.vendor || 'Unknown Vendor'}
+          </p>
+          <div className="flex items-center gap-2 text-xs text-text-muted mt-2">
+            <span>IP: {device.last_ip}</span>
             <span>•</span>
-            <span>{device.last_ip}</span>
-            <span>•</span>
-            <span className="font-mono">{device.mac}</span>
+            <span>MAC: {device.mac}</span>
           </div>
         </div>
-        <div className={`text-3xl font-bold px-4 py-2 rounded-lg ${gradeClass}`}>
+        
+        {/* Security Grade Badge */}
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-bold shrink-0 ${gradeClass}`}>
           {grade}
         </div>
       </div>
 
-      {/* Vulnerabilities */}
-      {device.vulnerabilities && device.vulnerabilities.length > 0 && (
-        <div className="mb-3">
-          <h4 className="text-xs font-medium mb-1.5 flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            Known Vulnerabilities ({device.vulnerabilities.length})
-          </h4>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
-            {device.vulnerabilities.map(vuln => (
-              <VulnBadge key={vuln.cve_id} vuln={vuln} />
+      {/* Known Vulnerabilities Section */}
+      {hasVulns && (
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="w-4 h-4 text-accent-red" />
+            <h4 className="text-sm font-bold text-accent-red uppercase tracking-wide">
+              Known Vulnerabilities ({device.vulnerabilities!.length})
+            </h4>
+          </div>
+          
+          <div className="space-y-2">
+            {device.vulnerabilities!.map(vuln => (
+              <div 
+                key={vuln.cve_id} 
+                className="p-4 rounded-xl bg-accent-red/5 border border-accent-red/10"
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className="font-mono text-sm font-bold text-accent-red">
+                    {vuln.cve_id}
+                  </span>
+                  {vuln.cvss_score && (
+                    <span className="text-sm font-bold text-accent-red bg-accent-red/10 px-2 py-0.5 rounded">
+                      CVSS {vuln.cvss_score.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  {vuln.description}
+                </p>
+              </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Port Warnings */}
-      {device.port_warnings && device.port_warnings.length > 0 && (
-        <div>
-          <h4 className="text-xs font-medium mb-1.5 flex items-center gap-1.5">
-            <Shield className="w-3.5 h-3.5" />
-            Port Security Warnings ({device.port_warnings.length})
-          </h4>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
-            {device.port_warnings.map(warning => (
-              <PortWarningBadge key={warning.port} warning={warning} />
-            ))}
+      {/* Port Security Warnings Section */}
+      {hasWarnings && (
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Shield className="w-4 h-4 text-accent-blue" />
+            <h4 className="text-sm font-bold text-accent-blue uppercase tracking-wide">
+              Port Security Warnings ({device.port_warnings!.length})
+            </h4>
+          </div>
+          
+          <div className="space-y-2">
+            {device.port_warnings!.map(warning => {
+              const severityColors = {
+                'LOW': 'bg-accent-blue/5 border-accent-blue/10 text-accent-blue',
+                'MEDIUM': 'bg-yellow-500/5 border-yellow-500/10 text-yellow-600 dark:text-yellow-500',
+                'HIGH': 'bg-accent-amber/5 border-accent-amber/10 text-accent-amber',
+                'CRITICAL': 'bg-accent-red/5 border-accent-red/10 text-accent-red',
+              };
+              const colorClass = severityColors[warning.severity as keyof typeof severityColors] || severityColors.LOW;
+              
+              return (
+                <div 
+                  key={warning.port} 
+                  className={`p-4 rounded-xl border ${colorClass}`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-sm">
+                      Port {warning.port} - {warning.service}
+                    </span>
+                    <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-current/10">
+                      {warning.severity}
+                    </span>
+                  </div>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    {warning.warning}
+                    {warning.recommendation && (
+                      <> → Use HTTPS (port 443)</>
+                    )}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* No Issues */}
-      {(!device.vulnerabilities || device.vulnerabilities.length === 0) &&
-       (!device.port_warnings || device.port_warnings.length === 0) && (
-        <div className="text-center py-4 text-muted-foreground">
-          <CheckCircle className="w-10 h-10 mx-auto mb-1.5 text-green-500" />
-          <p className="text-sm">No known vulnerabilities or security warnings</p>
+      {/* All Clear State */}
+      {isSecure && (
+        <div className="text-center py-8">
+          <div className="w-16 h-16 rounded-full bg-accent-green/10 flex items-center justify-center mx-auto mb-3">
+            <CheckCircle className="w-8 h-8 text-accent-green" />
+          </div>
+          <h4 className="text-lg font-bold text-text-primary mb-1">All Clear</h4>
+          <p className="text-sm text-text-muted">
+            No known vulnerabilities or security warnings found.
+          </p>
         </div>
-      )}
-    </div>
-  );
-}
-
-// Vulnerability Badge
-function VulnBadge({ vuln }: { vuln: VulnerabilityInfo }) {
-  const severityColors = {
-    'CRITICAL': 'bg-red-500/10 text-red-500 border-red-500/20',
-    'HIGH': 'bg-orange-500/10 text-orange-500 border-orange-500/20',
-    'MEDIUM': 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-    'LOW': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-  };
-
-  const colorClass = severityColors[vuln.severity as keyof typeof severityColors] || severityColors.LOW;
-
-  return (
-    <div className={`p-3 rounded-lg border ${colorClass}`}>
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <span className="font-mono text-xs font-semibold">{vuln.cve_id}</span>
-        {vuln.cvss_score && (
-          <span className="text-xs font-bold">{vuln.cvss_score.toFixed(1)}</span>
-        )}
-      </div>
-      <p className="text-xs leading-relaxed line-clamp-2">{vuln.description}</p>
-    </div>
-  );
-}
-
-// Port Warning Badge
-function PortWarningBadge({ warning }: { warning: PortWarning }) {
-  const severityColors = {
-    'CRITICAL': 'bg-red-500/10 text-red-500 border-red-500/20',
-    'HIGH': 'bg-orange-500/10 text-orange-500 border-orange-500/20',
-    'MEDIUM': 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-    'LOW': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-  };
-
-  const colorClass = severityColors[warning.severity as keyof typeof severityColors] || severityColors.LOW;
-
-  return (
-    <div className={`p-3 rounded-lg border ${colorClass}`}>
-      <div className="flex items-center justify-between mb-1">
-        <span className="font-semibold text-xs">
-          Port {warning.port} - {warning.service}
-        </span>
-        <span className="text-xs font-medium">{warning.severity}</span>
-      </div>
-      <p className="text-xs leading-relaxed mb-1">{warning.warning}</p>
-      {warning.recommendation && (
-        <p className="text-xs opacity-70 italic">→ {warning.recommendation}</p>
       )}
     </div>
   );

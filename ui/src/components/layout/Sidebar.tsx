@@ -1,240 +1,206 @@
+import { useState } from 'react';
 import {
   LayoutDashboard,
   Network,
-  Smartphone,
+  List,
   Shield,
   Bell,
   Wrench,
-  ChartBar,
+  FileText,
   Settings,
-  Scan,
-  Loader2,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
+import NavSection from './NavSection';
+import AdminProfile from './AdminProfile';
 
 type Page = 'dashboard' | 'topology' | 'devices' | 'vulnerabilities' | 'alerts' | 'tools' | 'reports' | 'settings' | 'profile' | 'demo';
 
 interface SidebarProps {
   currentPage: Page;
   onNavigate: (page: Page) => void;
-  onScan?: () => void;
-  isScanning?: boolean;
-  isCollapsed: boolean;
-  onToggleCollapse: () => void;
+  vulnerabilityCount?: number;
 }
 
-interface NavGroup {
-  title: string;
-  items: NavItem[];
-}
-
-interface NavItem {
+interface NavItemData {
   id: Page;
   label: string;
   icon: any;
+  badge?: number;
 }
 
-const navGroups: NavGroup[] = [
-  {
-    title: 'MAIN',
-    items: [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'topology', label: 'Topology', icon: Network },
-      { id: 'devices', label: 'Devices', icon: Smartphone },
-    ],
-  },
-  {
-    title: 'SECURITY',
-    items: [
-      { id: 'vulnerabilities', label: 'Vulnerabilities', icon: Shield },
-      { id: 'alerts', label: 'Alerts', icon: Bell },
-    ],
-  },
-  {
-    title: 'UTILITIES',
-    items: [
-      { id: 'tools', label: 'Tools', icon: Wrench },
-      { id: 'reports', label: 'Reports', icon: ChartBar },
-    ],
-  },
-  {
-    title: 'SYSTEM',
-    items: [
-      { id: 'settings', label: 'Settings', icon: Settings },
-    ],
-  },
-];
+interface NavGroupData {
+  title: string;
+  items: NavItemData[];
+}
 
 export default function Sidebar({ 
   currentPage, 
-  onNavigate, 
-  onScan, 
-  isScanning = false,
-  isCollapsed,
-  onToggleCollapse,
+  onNavigate,
+  vulnerabilityCount = 2,
 }: SidebarProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const navGroups: NavGroupData[] = [
+    {
+      title: 'MAIN',
+      items: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'topology', label: 'Topology Map', icon: Network },
+        { id: 'devices', label: 'Device List', icon: List },
+      ],
+    },
+    {
+      title: 'SECURITY',
+      items: [
+        { id: 'vulnerabilities', label: 'Vulnerabilities', icon: Shield },
+        { id: 'alerts', label: 'Alerts', icon: Bell },
+      ],
+    },
+    {
+      title: 'UTILITIES',
+      items: [
+        { id: 'tools', label: 'Tools', icon: Wrench },
+        { id: 'reports', label: 'Reports', icon: FileText },
+      ],
+    },
+    {
+      title: 'SYSTEM',
+      items: [
+        { id: 'settings', label: 'Settings', icon: Settings },
+      ],
+    },
+  ];
+
   return (
     <motion.aside 
-      initial={false}
-      animate={{ 
-        width: isCollapsed ? 72 : 260 
-      }}
-      transition={{ 
-        type: 'spring', 
-        stiffness: 300, 
-        damping: 30 
-      }}
-      className="relative glass border-r border-theme flex flex-col noise-texture"
+      className={clsx(
+        'bg-bg-elevated border-r border-theme flex flex-col h-full relative transition-all duration-300',
+        isCollapsed ? 'w-20' : 'w-64'
+      )}
+      animate={{ width: isCollapsed ? 80 : 256 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
     >
-      {/* Logo */}
-      <div className="p-4 border-b border-theme flex items-center justify-between">
-        <AnimatePresence mode="wait">
-          {!isCollapsed && (
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.2 }}
-              className="flex items-center gap-3 flex-1"
-            >
-              <div className="w-10 h-10 rounded-xl bg-accent-blue/20 flex items-center justify-center shrink-0">
-                <Network className="w-6 h-6 text-accent-blue" />
-              </div>
-              <div className="overflow-hidden">
-                <h1 className="font-semibold text-text-primary whitespace-nowrap">NetMapper</h1>
-                <p className="text-xs text-text-muted whitespace-nowrap">Topology Monitor</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
-        {isCollapsed && (
-          <div className="w-10 h-10 rounded-xl bg-accent-blue/20 flex items-center justify-center mx-auto">
-            <Network className="w-6 h-6 text-accent-blue" />
+      {/* Collapse Toggle Button */}
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full bg-bg-elevated border border-theme 
+                   flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-hover
+                   transition-all shadow-lg"
+        title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
+
+      {/* Logo Section */}
+      <div className={clsx('p-6 border-b border-theme', isCollapsed && 'px-3')}>
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className={clsx('flex items-center', isCollapsed ? 'justify-center' : 'gap-3')}
+        >
+          <div className="w-12 h-12 flex items-center justify-center shrink-0">
+            <img src="/icon.png" alt="NetMapper Pro" className="w-full h-full object-contain" />
           </div>
-        )}
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <h1 className="text-lg font-bold text-text-primary whitespace-nowrap">NetMapper</h1>
+                <p className="text-xs text-text-muted whitespace-nowrap">Pro Edition</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </div>
 
-      {/* Scan Button - Unique Square/Rectangular Design */}
-      {onScan && (
-        <div className="px-3 pt-4 pb-3">
-          <motion.button
-            onClick={onScan}
-            disabled={isScanning}
-            whileHover={{ scale: 1.03, y: -2 }}
-            whileTap={{ scale: 0.97 }}
-            className={clsx(
-              'w-full flex items-center justify-center gap-3 px-4 py-4 rounded-lg transition-all duration-300 relative overflow-hidden group',
-              'bg-gradient-to-br from-accent-purple via-accent-blue to-accent-purple text-white font-bold shadow-2xl',
-              'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100',
-              !isScanning && 'hover:shadow-accent-purple/60'
-            )}
-            style={{
-              boxShadow: isScanning 
-                ? '0 8px 32px rgba(139, 92, 246, 0.4)' 
-                : '0 8px 32px rgba(139, 92, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.3)',
-            }}
-          >
-            {/* Animated gradient overlay */}
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-              animate={{
-                x: isScanning ? ['-100%', '200%'] : ['0%', '0%'],
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: isScanning ? Infinity : 0,
-                ease: 'linear',
-              }}
-            />
-
-            {/* Pulse ring animation when not scanning */}
-            {!isScanning && (
-              <motion.div
-                className="absolute inset-0 rounded-lg border-2 border-white/50"
-                animate={{
-                  scale: [1, 1.1, 1],
-                  opacity: [0.5, 0, 0.5],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
-            )}
-
-            {/* Content */}
-            <div className="relative z-10 flex items-center gap-3">
-              {isScanning ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Scan className="w-5 h-5" />
-              )}
-              <AnimatePresence mode="wait">
-                {!isCollapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, x: -5 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -5 }}
-                    className="font-bold text-base tracking-wide"
-                  >
-                    {isScanning ? 'Scanning...' : 'START SCAN'}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.button>
-        </div>
-      )}
-
-      {/* Navigation - Grouped */}
-      <nav className="flex-1 p-2 overflow-y-auto">
-        {navGroups.map((group, groupIndex) => (
-          <div key={group.title} className={groupIndex > 0 ? 'mt-6' : ''}>
-            {/* Group Title */}
-            <AnimatePresence mode="wait">
+      {/* Navigation */}
+      <nav className={clsx('flex-1 overflow-y-auto', isCollapsed ? 'p-2' : 'p-4')}>
+        {navGroups.map((group) => (
+          <div key={group.title} className="mb-6">
+            {/* Section Title - Hidden when collapsed */}
+            <AnimatePresence>
               {!isCollapsed && (
                 <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.15 }}
-                  className="px-3 py-2 mb-1"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="px-4 mb-2"
                 >
-                  <p className="text-xs font-semibold text-text-muted tracking-wider">
+                  <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">
                     {group.title}
-                  </p>
+                  </span>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Group Items */}
+            {/* Nav Items */}
             <div className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentPage === item.id;
                 
                 return (
-                  <button
+                  <motion.button
                     key={item.id}
                     onClick={() => onNavigate(item.id)}
                     className={clsx(
-                      'w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200',
-                      'group relative',
+                      'w-full flex items-center rounded-lg transition-all duration-200 group relative',
+                      isCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3',
                       isActive
-                        ? 'bg-accent-blue text-white shadow-lg shadow-accent-blue/25'
+                        ? 'bg-accent-blue/10 text-accent-blue font-medium'
                         : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
                     )}
+                    whileHover={{ x: isCollapsed ? 0 : 2 }}
+                    whileTap={{ scale: 0.98 }}
+                    title={isCollapsed ? item.label : undefined}
                   >
+                    {/* Icon */}
+                    <Icon className="w-5 h-5 shrink-0" />
+                    
+                    {/* Label - Hidden when collapsed */}
+                    <AnimatePresence>
+                      {!isCollapsed && (
+                        <motion.span
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -10 }}
+                          transition={{ duration: 0.2 }}
+                          className="font-medium text-sm flex-1 text-left whitespace-nowrap"
+                        >
+                          {item.label}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Badge */}
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className={clsx(
+                          'bg-accent-red text-white text-xs font-bold rounded-full',
+                          isCollapsed 
+                            ? 'absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center text-[10px]'
+                            : 'px-2 py-0.5'
+                        )}
+                      >
+                        {item.badge}
+                      </motion.span>
+                    )}
+                    
                     {/* Active Indicator */}
                     {isActive && (
                       <motion.div
-                        layoutId="activeTab"
-                        className="absolute inset-0 bg-accent-blue rounded-lg"
+                        layoutId="activeIndicator"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-blue rounded-r-full"
                         initial={false}
                         transition={{
                           type: 'spring',
@@ -244,31 +210,15 @@ export default function Sidebar({
                       />
                     )}
 
-                    {/* Icon */}
-                    <Icon className={clsx('w-5 h-5 shrink-0 relative z-10')} />
-
-                    {/* Label */}
-                    <AnimatePresence mode="wait">
-                      {!isCollapsed && (
-                        <motion.span
-                          initial={{ opacity: 0, x: -5 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -5 }}
-                          transition={{ duration: 0.15 }}
-                          className="font-medium whitespace-nowrap overflow-hidden text-ellipsis relative z-10"
-                        >
-                          {item.label}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Tooltip for collapsed state */}
+                    {/* Tooltip on hover when collapsed */}
                     {isCollapsed && (
-                      <div className="absolute left-full ml-2 px-3 py-2 bg-bg-tertiary border border-theme rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                        <span className="text-sm text-text-primary">{item.label}</span>
+                      <div className="absolute left-full ml-2 px-2 py-1 bg-bg-elevated border border-theme rounded-md
+                                      opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none
+                                      whitespace-nowrap text-sm text-text-primary shadow-lg z-50">
+                        {item.label}
                       </div>
                     )}
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
@@ -276,22 +226,9 @@ export default function Sidebar({
         ))}
       </nav>
 
-      {/* Bottom Actions - Only collapse toggle */}
-      <div className="p-3 border-t border-theme">
-        <button
-          onClick={onToggleCollapse}
-          className="w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-text-muted hover:bg-bg-hover hover:text-text-primary transition-all duration-200"
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="w-5 h-5" />
-          ) : (
-            <div className="flex items-center gap-2">
-              <ChevronLeft className="w-5 h-5" />
-              <span className="text-sm font-medium">Collapse</span>
-            </div>
-          )}
-        </button>
+      {/* Admin Profile */}
+      <div className={clsx(isCollapsed && 'px-2')}>
+        <AdminProfile isCollapsed={isCollapsed} />
       </div>
     </motion.aside>
   );

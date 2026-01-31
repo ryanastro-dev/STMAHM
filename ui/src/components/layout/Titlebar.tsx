@@ -106,7 +106,7 @@ export default function Titlebar({ transparent = false }: TitlebarProps) {
         </div>
         {/* Draggable area */}
         <div className="flex-1 text-center text-sm font-medium text-text-secondary" data-tauri-drag-region>
-          Network Topology Mapper
+          NetMapper Pro
         </div>
         <div className="w-[100px]"></div> {/* Spacer for symmetry */}
       </div>
@@ -121,7 +121,7 @@ export default function Titlebar({ transparent = false }: TitlebarProps) {
       }`}>
         {/* Draggable area - invisible title for wider drag area */}
         <div className="flex-1 px-3 text-sm font-medium text-transparent" data-tauri-drag-region>
-          Network Topology Mapper
+          NetMapper Pro
         </div>
         {/* Button area - NO drag region */}
         <div className="flex h-full z-10">
@@ -186,7 +186,7 @@ export default function Titlebar({ transparent = false }: TitlebarProps) {
   return (
     <div className="h-8 bg-bg-secondary border-b border-theme flex items-center px-3 select-none" data-tauri-drag-region>
       <div className="flex-1 text-center text-sm font-medium text-text-secondary">
-        Network Topology Mapper
+        NetMapper Pro
       </div>
     </div>
   );

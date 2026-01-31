@@ -39,6 +39,7 @@ export interface HostInfo {
   vulnerabilities?: VulnerabilityInfo[];
   port_warnings?: PortWarning[];
   security_grade?: string;
+  last_seen?: string; // ISO timestamp of last detection
 }
 
 export interface ScanResult {
@@ -54,8 +55,11 @@ export interface ScanResult {
   active_hosts: HostInfo[];
 }
 
+export type ScanStatus = 'ready' | 'scanning' | 'complete';
+
 export interface ScanState {
   isScanning: boolean;
+  scanStatus: ScanStatus;
   scanResult: ScanResult | null;
   error: string | null;
   lastScanTime: Date | null;
@@ -79,6 +83,7 @@ function isTauri(): boolean {
 export function useScan() {
   const [state, setState] = useState<ScanState>({
     isScanning: false,
+    scanStatus: 'ready',
     scanResult: null,
     error: null,
     lastScanTime: null,
@@ -100,6 +105,7 @@ export function useScan() {
     setState(prev => ({
       ...prev,
       isScanning: true,
+      scanStatus: 'scanning',
       error: null,
     }));
 
@@ -108,12 +114,22 @@ export function useScan() {
       const command = isDemoMode ? 'mock_scan_network' : 'scan_network';
       const result = await invoke<ScanResult>(command);
       
+      // Show "Scan Complete!" state
       setState({
         isScanning: false,
+        scanStatus: 'complete',
         scanResult: result,
         error: null,
         lastScanTime: new Date(),
       });
+
+      // After 1 second, return to ready state
+      setTimeout(() => {
+        setState(prev => ({
+          ...prev,
+          scanStatus: 'ready',
+        }));
+      }, 1000);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       
@@ -122,12 +138,14 @@ export function useScan() {
         setState(prev => ({
           ...prev,
           isScanning: false,
+          scanStatus: 'ready',
           error: 'Not running in Tauri environment. Please run with `npm run tauri dev`.',
         }));
       } else {
         setState(prev => ({
           ...prev,
           isScanning: false,
+          scanStatus: 'ready',
           error: errorMessage,
         }));
       }

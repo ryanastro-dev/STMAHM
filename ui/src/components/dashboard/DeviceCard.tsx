@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Monitor, Server, Laptop, Smartphone, Printer, Camera, Router, Cpu, Activity, HardDrive, Clock, Zap } from 'lucide-react';
+import { Monitor, Server, Laptop, Smartphone, Printer, Camera, Router, Cpu, Activity, Signal, Wifi } from 'lucide-react';
 import { HostInfo } from '../../hooks/useScan';
 
 interface DeviceCardProps {
@@ -31,15 +31,25 @@ const deviceColors: Record<string, string> = {
   SWITCH: '#10B981',
 };
 
+// Utility: Format relative time
+function getRelativeTime(isoTimestamp: string): string {
+  const now = new Date();
+  const past = new Date(isoTimestamp);
+  const diffMs = now.getTime() - past.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffSec < 60) return 'Just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${diffDay}d ago`;
+}
+
 export default function DeviceCard({ device, onClick }: DeviceCardProps) {
   const Icon = deviceIcons[device.device_type] || Monitor;
   const color = deviceColors[device.device_type] || '#6B7280';
-  
-  // Mock data for uptime and metrics (replace with real data when available)
-  const cpuUsage = Math.floor(Math.random() * 80) + 20; // 20-100%
-  const memoryUsage = Math.floor(Math.random() * 70) + 30; // 30-100%
-  const uptimeDays = Math.floor(Math.random() * 100);
-  const uptimeHours = Math.floor(Math.random() * 24);
   
   const isOnline = device.response_time_ms !== null && device.response_time_ms !== undefined;
   const isWarning = device.risk_score >= 50;
@@ -52,6 +62,11 @@ export default function DeviceCard({ device, onClick }: DeviceCardProps) {
   };
   
   const status = getStatusBadge();
+  
+  // Format last seen timestamp
+  const lastSeenText = device.last_seen 
+    ? getRelativeTime(device.last_seen)
+    : (isOnline ? 'Just now' : 'Unknown');
   
   return (
     <motion.div
@@ -96,56 +111,71 @@ export default function DeviceCard({ device, onClick }: DeviceCardProps) {
         <p className="font-mono text-sm text-accent-blue font-medium">{device.ip}</p>
       </div>
 
-      {/* CPU Usage */}
-      <div className="mb-3">
-        <div className="flex items-center justify-between mb-1.5">
-          <div className="flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-text-muted" />
-            <span className="text-xs text-text-muted">CPU</span>
+      {/* Real Network Metrics */}
+      <div className="space-y-3 mb-4">
+        {/* Response Time */}
+        {device.response_time_ms !== null && device.response_time_ms !== undefined && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Signal className="w-3.5 h-3.5 text-text-muted" />
+              <span className="text-xs text-text-muted">Response Time</span>
+            </div>
+            <span className="text-xs font-semibold text-text-primary">
+              {device.response_time_ms}ms
+            </span>
           </div>
-          <span className="text-xs font-semibold text-text-primary">{cpuUsage}%</span>
-        </div>
-        <div className="h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
-          <motion.div
-            className={`h-full rounded-full ${
-              cpuUsage > 80 ? 'bg-accent-red' : cpuUsage > 60 ? 'bg-accent-amber' : 'bg-accent-green'
+        )}
+
+        {/* Open Ports */}
+        {device.open_ports && device.open_ports.length > 0 && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Wifi className="w-3.5 h-3.5 text-text-muted" />
+              <span className="text-xs text-text-muted">Open Ports</span>
+            </div>
+            <span className="text-xs font-semibold text-text-primary">
+              {device.open_ports.slice(0, 3).join(', ')}
+              {device.open_ports.length > 3 && `+${device.open_ports.length - 3}`}
+            </span>
+          </div>
+        )}
+
+        {/* Vendor */}
+        {device.vendor && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-text-muted">Vendor</span>
+            <span className="text-xs font-semibold text-text-primary truncate max-w-[180px]">
+              {device.vendor}
+            </span>
+          </div>
+        )}
+
+        {/* Risk Score */}
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-text-muted">Risk Score</span>
+          <span 
+            className={`text-xs font-semibold ${
+              device.risk_score >= 70 ? 'text-accent-red' : 
+              device.risk_score >= 40 ? 'text-accent-amber' : 
+              'text-accent-green'
             }`}
-            initial={{ width: 0 }}
-            animate={{ width: `${cpuUsage}%` }}
-            transition={{ delay: 0.2, duration: 0.8, ease: 'easeOut' }}
-          />
+          >
+            {device.risk_score}/100
+          </span>
         </div>
       </div>
 
-      {/* Memory Usage */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-1.5">
-          <div className="flex items-center gap-1.5">
-            <HardDrive className="w-3.5 h-3.5 text-text-muted" />
-            <span className="text-xs text-text-muted">Memory</span>
-          </div>
-          <span className="text-xs font-semibold text-text-primary">{memoryUsage}%</span>
-        </div>
-        <div className="h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
-          <motion.div
-            className={`h-full rounded-full ${
-              memoryUsage > 80 ? 'bg-accent-red' : memoryUsage > 60 ? 'bg-accent-amber' : 'bg-accent-blue'
-            }`}
-            initial={{ width: 0 }}
-            animate={{ width: `${memoryUsage}%` }}
-            transition={{ delay: 0.3, duration: 0.8, ease: 'easeOut' }}
-          />
-        </div>
-      </div>
-
-      {/* Footer: Uptime & Last Seen */}
+      {/* Footer: Security Grade & Last Seen */}
       <div className="grid grid-cols-2 gap-3 pt-3 border-t border-theme">
         <div>
-          <div className="flex items-center gap-1 mb-1">
-            <Clock className="w-3 h-3 text-text-muted" />
-            <p className="text-xs text-text-muted">Uptime</p>
-          </div>
-          <p className="text-xs font-semibold text-text-primary">{uptimeDays}d {uptimeHours}h</p>
+          <p className="text-xs text-text-muted mb-1">Security Grade</p>
+          <p className={`text-lg font-bold ${
+            ['A', 'B'].includes(device.security_grade || '') ? 'text-accent-green' :
+            ['C', 'D'].includes(device.security_grade || '') ? 'text-accent-amber' :
+            'text-accent-red'
+          }`}>
+            {device.security_grade || 'N/A'}
+          </p>
         </div>
         <div>
           <div className="flex items-center gap-1 mb-1">
@@ -153,7 +183,7 @@ export default function DeviceCard({ device, onClick }: DeviceCardProps) {
             <p className="text-xs text-text-muted">Last Seen</p>
           </div>
           <p className="text-xs font-semibold text-text-primary">
-            {isOnline ? 'Now' : 'Offline'}
+            {lastSeenText}
           </p>
         </div>
       </div>

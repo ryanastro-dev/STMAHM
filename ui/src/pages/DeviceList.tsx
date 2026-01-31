@@ -97,14 +97,6 @@ export default function DeviceList({ onDeviceClick }: DeviceListProps) {
 
   return (
     <div className="p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-text-primary">Devices</h1>
-        <p className="text-text-muted mt-1">
-          Manage and monitor all discovered network devices
-        </p>
-      </div>
-
       {/* Search Bar */}
       <div className="mb-6">
         <div className="relative max-w-md">

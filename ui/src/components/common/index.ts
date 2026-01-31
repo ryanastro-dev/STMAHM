@@ -10,3 +10,6 @@ export { default as ThemeToggle } from './ThemeToggle';
 export { default as ErrorBoundary } from './ErrorBoundary';
 export { default as AlertBadge } from './AlertBadge';
 export { default as AlertPanel } from './AlertPanel';
+export { default as Breadcrumb } from './Breadcrumb';
+export { default as MetricCard } from './MetricCard';
+export { default as FAB } from './FAB';

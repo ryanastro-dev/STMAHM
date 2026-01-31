@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Save, RefreshCw, Check, AlertCircle } from 'lucide-react';
+import { Save, RefreshCw, Activity, Network, Zap, Shield, Clock, Hash, ChevronDown, ChevronUp, Radio } from 'lucide-react';
+import { useMonitoring } from '../hooks/useMonitoring';
 
 // Default settings
 const DEFAULT_SETTINGS = {
   snmpEnabled: false,
   snmpCommunity: 'public',
   scanInterval: 60,
-  tcpPorts: '22,80,443,445,8080,3389',
+  tcpPorts: '22, 80, 443, 445, 8080, 3389',
+  monitoringEnabled: false,
+  monitoringInterval: 60,
 };
 
-// Storage key
 const SETTINGS_KEY = 'netmapper-settings';
 
-// Load settings from localStorage
 function loadSettings() {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
@@ -25,7 +26,6 @@ function loadSettings() {
   return DEFAULT_SETTINGS;
 }
 
-// Save settings to localStorage
 function saveSettingsToStorage(settings: typeof DEFAULT_SETTINGS) {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -36,24 +36,47 @@ function saveSettingsToStorage(settings: typeof DEFAULT_SETTINGS) {
   }
 }
 
+// Toggle Switch Component
+function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`relative w-12 h-6 rounded-full transition-colors ${
+        enabled ? 'bg-accent-purple' : 'bg-gray-300 dark:bg-gray-600'
+      }`}
+    >
+      <div
+        className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
+          enabled ? 'translate-x-6' : 'translate-x-0.5'
+        }`}
+      />
+    </button>
+  );
+}
+
 export default function Settings() {
+  // Monitoring hook
+  const monitoring = useMonitoring();
+  
   const [snmpEnabled, setSnmpEnabled] = useState(DEFAULT_SETTINGS.snmpEnabled);
   const [snmpCommunity, setSnmpCommunity] = useState(DEFAULT_SETTINGS.snmpCommunity);
   const [scanInterval, setScanInterval] = useState(DEFAULT_SETTINGS.scanInterval);
   const [tcpPorts, setTcpPorts] = useState(DEFAULT_SETTINGS.tcpPorts);
+  const [monitoringEnabled, setMonitoringEnabled] = useState(DEFAULT_SETTINGS.monitoringEnabled);
+  const [monitoringInterval, setMonitoringInterval] = useState(DEFAULT_SETTINGS.monitoringInterval);
   
-  // UI state
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [hasChanges, setHasChanges] = useState(false);
-  
-  // Vulnerability database state
+  const [demoMode, setDemoMode] = useState(localStorage.getItem('demo-mode-enabled') === 'true');
   const [autoUpdateVulnDB, setAutoUpdateVulnDB] = useState(false);
   const [syncRange, setSyncRange] = useState('latest_1000');
+  const [vulnDBExpanded, setVulnDBExpanded] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState(0);
-  const [embeddedCVEs] = useState(150); // Static count from seed data
-  const [downloadedCVEs] = useState(0); // Will be dynamic when backend is implemented
-  const [lastUpdate] = useState<string | null>(null);
+  
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const embeddedCVEs = 150;
+  const downloadedCVEs = 0;
+  const lastUpdate = null;
 
   // Load settings on mount
   useEffect(() => {
@@ -62,352 +85,337 @@ export default function Settings() {
     setSnmpCommunity(settings.snmpCommunity);
     setScanInterval(settings.scanInterval);
     setTcpPorts(settings.tcpPorts);
+    setMonitoringEnabled(settings.monitoringEnabled || false);
+    setMonitoringInterval(settings.monitoringInterval || 60);
   }, []);
 
   // Track changes
   useEffect(() => {
-    const current = { snmpEnabled, snmpCommunity, scanInterval, tcpPorts };
+    const current = { snmpEnabled, snmpCommunity, scanInterval, tcpPorts, monitoringEnabled, monitoringInterval };
     const saved = loadSettings();
     const changed = JSON.stringify(current) !== JSON.stringify(saved);
     setHasChanges(changed);
-  }, [snmpEnabled, snmpCommunity, scanInterval, tcpPorts]);
+  }, [snmpEnabled, snmpCommunity, scanInterval, tcpPorts, monitoringEnabled, monitoringInterval]);
 
-  // Save settings
   const handleSave = () => {
     setSaveStatus('saving');
-    const settings = { snmpEnabled, snmpCommunity, scanInterval, tcpPorts };
+    const settings = { snmpEnabled, snmpCommunity, scanInterval, tcpPorts, monitoringEnabled, monitoringInterval };
     
     setTimeout(() => {
       if (saveSettingsToStorage(settings)) {
         setSaveStatus('saved');
         setHasChanges(false);
         setTimeout(() => setSaveStatus('idle'), 2000);
-      } else {
-        setSaveStatus('error');
-        setTimeout(() => setSaveStatus('idle'), 3000);
       }
     }, 300);
   };
 
-  // Reset to defaults
   const handleReset = () => {
     setSnmpEnabled(DEFAULT_SETTINGS.snmpEnabled);
     setSnmpCommunity(DEFAULT_SETTINGS.snmpCommunity);
     setScanInterval(DEFAULT_SETTINGS.scanInterval);
     setTcpPorts(DEFAULT_SETTINGS.tcpPorts);
+    setMonitoringEnabled(DEFAULT_SETTINGS.monitoringEnabled);
+    setMonitoringInterval(DEFAULT_SETTINGS.monitoringInterval);
     saveSettingsToStorage(DEFAULT_SETTINGS);
     setSaveStatus('saved');
     setHasChanges(false);
     setTimeout(() => setSaveStatus('idle'), 2000);
   };
 
-  // Sync vulnerability database (UI-only simulation - backend to be implemented)
   const handleSyncDatabase = () => {
     setIsSyncing(true);
-    setSyncProgress(0);
-    
-    // Simulate progress
-    const progressInterval = setInterval(() => {
-      setSyncProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          setTimeout(() => {
-            setIsSyncing(false);
-            setSyncProgress(0);
-            // Show success message (can be enhanced with toast notification)
-            alert(`✅ Sync simulated!\n\nRange: ${syncRange}\n\nNote: Backend NVD API integration not yet implemented.\nThis is a UI-only demo.`);
-          }, 500);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 200);
+    setTimeout(() => {
+      setIsSyncing(false);
+      alert('✅ Database sync simulated! Backend integration pending.');
+    }, 2000);
+  };
+
+  const handleDemoModeToggle = () => {
+    const newValue = !demoMode;
+    setDemoMode(newValue);
+    localStorage.setItem('demo-mode-enabled', newValue.toString());
+    // Reload to apply demo mode change
+    setTimeout(() => window.location.reload(), 300);
   };
 
   return (
-    <div className="p-8 max-w-3xl">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-text-primary">Settings</h1>
-        <p className="text-text-muted mt-1">Configure scanner and application settings</p>
+    <div className="p-4 max-w-3xl mx-auto min-h-screen flex flex-col">
+      {/* Configuration Section */}
+      <div className="bg-bg-secondary border border-theme rounded-xl p-6 mb-4">
+        <div className="flex items-center gap-3 mb-6">
+          <Activity className="w-5 h-5 text-accent-purple" />
+          <h2 className="text-lg font-bold text-text-primary">Configuration</h2>
+        </div>
+        <p className="text-sm text-text-muted mb-6">Manage scanner behavior and application preferences.</p>
+
+        <div className="space-y-6">
+          {/* Scan Settings Card */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="w-4 h-4 text-accent-purple" />
+              <h3 className="text-sm font-bold text-text-primary">Scan Settings</h3>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-text-secondary mb-2 uppercase">
+                  Auto-Scan Interval
+                </label>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+                  <select
+                    value={scanInterval}
+                    onChange={(e) => setScanInterval(Number(e.target.value))}
+                    className="w-full pl-10 pr-3 py-2.5 bg-bg-tertiary border border-theme rounded-lg text-text-primary focus:outline-none focus:border-accent-purple transition-colors appearance-none cursor-pointer"
+                  >
+                    <option value={10}>10 seconds</option>
+                    <option value={30}>30 seconds</option>
+                    <option value={60}>1 minute</option>
+                    <option value={300}>5 minutes</option>
+                    <option value={600}>10 minutes</option>
+                    <option value={1800}>30 minutes</option>
+                    <option value={3600}>1 hour</option>
+                  </select>
+                </div>
+                <p className="text-xs text-text-muted mt-1.5">How often to automatically scan the network.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-text-secondary mb-2 uppercase">
+                  TCP Ports to Probe
+                </label>
+                <div className="relative">
+                  <Hash className="absolute left-3 top-3 w-4 h-4 text-text-muted" />
+                  <textarea
+                    value={tcpPorts}
+                    onChange={(e) => setTcpPorts(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2.5 bg-bg-tertiary border border-theme rounded-lg text-text-primary font-mono text-sm focus:outline-none focus:border-accent-purple transition-colors resize-none"
+                    rows={2}
+                    placeholder="22, 80, 443, 8080"
+                  />
+                </div>
+                <p className="text-xs text-text-muted mt-1.5">Comma-separated list of ports.</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Scan Settings */}
-      <section className="card p-6 mb-6">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Scan Settings</h2>
-        
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Auto-scan Interval (seconds)
-            </label>
-            <input
-              type="number"
-              value={scanInterval}
-              onChange={(e) => setScanInterval(Number(e.target.value))}
-              className="w-full px-4 py-2.5 bg-bg-tertiary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
-              min={10}
-              max={3600}
-            />
-            <p className="text-xs text-text-muted mt-1">
-              Set to 0 to disable automatic scanning
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              TCP Ports to Probe
-            </label>
-            <input
-              type="text"
-              value={tcpPorts}
-              onChange={(e) => setTcpPorts(e.target.value)}
-              className="w-full px-4 py-2.5 bg-bg-tertiary border border-white/10 rounded-lg text-text-primary font-mono text-sm focus:outline-none focus:border-accent-blue transition-colors"
-              placeholder="22,80,443,8080"
-            />
-            <p className="text-xs text-text-muted mt-1">
-              Comma-separated list of ports
-            </p>
-          </div>
-        </div>
-      </section>
-
       {/* SNMP Settings */}
-      <section className="card p-6 mb-6">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">SNMP Settings</h2>
-        
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-text-primary">Enable SNMP Enrichment</p>
-              <p className="text-sm text-text-muted">
-                Query devices for additional information via SNMP
-              </p>
+      <div className="bg-bg-secondary border border-theme rounded-xl p-5 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="p-2 bg-accent-blue/10 rounded-lg">
+              <Network className="w-5 h-5 text-accent-blue" />
             </div>
+            <div>
+              <h3 className="text-sm font-bold text-text-primary">SNMP Settings</h3>
+              <p className="text-xs text-text-muted mt-0.5">Enable SNMP to gather detailed device information like system description and uptime.</p>
+            </div>
+          </div>
+          <Toggle enabled={snmpEnabled} onToggle={() => setSnmpEnabled(!snmpEnabled)} />
+        </div>
+      </div>
+
+      {/* Network Monitoring */}
+      <div className="bg-bg-secondary border border-theme rounded-xl p-5 mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="p-2 bg-accent-purple/10 rounded-lg">
+              <Radio className="w-5 h-5 text-accent-purple" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-text-primary">Network Monitoring</h3>
+              <p className="text-xs text-text-muted mt-0.5">Auto-start real-time network monitoring on app launch.</p>
+            </div>
+          </div>
+          <Toggle enabled={monitoringEnabled} onToggle={() => setMonitoringEnabled(!monitoringEnabled)} />
+        </div>
+
+        {monitoringEnabled && (
+          <div className="pt-4 border-t border-theme space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-text-secondary mb-2 uppercase">
+                Monitoring Interval
+              </label>
+              <div className="relative">
+                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+                <select
+                  value={monitoringInterval}
+                  onChange={(e) => setMonitoringInterval(Number(e.target.value))}
+                  className="w-full pl-10 pr-3 py-2.5 bg-bg-tertiary border border-theme rounded-lg text-text-primary focus:outline-none focus:border-accent-purple transition-colors appearance-none cursor-pointer"
+                >
+                  <option value={10}>10 seconds</option>
+                  <option value={30}>30 seconds</option>
+                  <option value={60}>1 minute</option>
+                  <option value={300}>5 minutes</option>
+                  <option value={600}>10 minutes</option>
+                  <option value={1800}>30 minutes</option>
+                  <option value={3600}>1 hour</option>
+                </select>
+              </div>
+              <p className="text-xs text-text-muted mt-1.5">How often to scan the network.</p>
+            </div>
+
+            {/* Current Status from Hook */}
+            <div className="p-4 bg-bg-tertiary rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-text-secondary">Current Status:</span>
+                <span className={`text-xs font-bold px-2 py-1 rounded ${
+                  monitoring.status.is_running
+                    ? 'bg-accent-green/20 text-accent-green'
+                    : 'bg-gray-500/20 text-gray-500'
+                }`}>
+                  {monitoring.status.is_running ? 'ACTIVE' : 'IDLE'}
+                </span>
+              </div>
+              {monitoring.status.is_running && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-text-muted">Scans Completed:</span>
+                    <span className="text-text-primary font-medium">{monitoring.status.scan_count}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-text-muted">Devices Online:</span>
+                    <span className="text-text-primary font-medium">
+                      {monitoring.status.devices_online} / {monitoring.status.devices_total}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Demo Mode */}
+      <div className="bg-bg-secondary border border-theme rounded-xl p-5 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="p-2 bg-accent-red/10 rounded-lg">
+              <Zap className="w-5 h-5 text-accent-red" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-text-primary">Demo Mode</h3>
+              <p className="text-xs text-text-muted mt-0.5">Use mock data for demonstration.</p>
+            </div>
+          </div>
+          <Toggle enabled={demoMode} onToggle={handleDemoModeToggle} />
+        </div>
+      </div>
+
+      {/* Vulnerability Database */}
+      <div className="bg-bg-secondary border border-theme rounded-xl p-5 mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="p-2 bg-accent-red/10 rounded-lg">
+              <Shield className="w-5 h-5 text-accent-red" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-text-primary">Vulnerability Database</h3>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium text-accent-blue px-2 py-1 bg-accent-blue/10 rounded">
+              Auto-update
+            </span>
+            <Toggle enabled={autoUpdateVulnDB} onToggle={() => setAutoUpdateVulnDB(!autoUpdateVulnDB)} />
+          </div>
+        </div>
+
+        {/* Expandable Section */}
+        <button
+          onClick={() => setVulnDBExpanded(!vulnDBExpanded)}
+          className="w-full flex items-center justify-between text-sm text-text-secondary hover:text-text-primary transition-colors"
+        >
+          <span className="text-xs uppercase font-semibold">Database Details</span>
+          {vulnDBExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+
+        {vulnDBExpanded && (
+          <div className="mt-4 space-y-4 pt-4 border-t border-theme">
+            {/* Sync Range */}
+            <div>
+              <label className="block text-xs font-bold text-text-secondary mb-2 uppercase">Sync Range</label>
+              <select
+                value={syncRange}
+                onChange={(e) => setSyncRange(e.target.value)}
+                className="w-full px-3 py-2.5 bg-bg-tertiary border border-theme rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent-purple"
+              >
+                <option value="latest_1000">Latest 1,000 CVEs (~500 KB)</option>
+                <option value="latest_5000">Latest 5,000 CVEs (~2.5 MB)</option>
+                <option value="last_30_days">Last 30 Days (~200 KB)</option>
+                <option value="last_90_days">Last 90 Days (~600 KB)</option>
+              </select>
+              <p className="text-xs text-text-muted mt-1.5">Larger ranges provide better coverage but take longer to sync.</p>
+            </div>
+
+            {/* CVE Statistics */}
+            <div className="bg-bg-tertiary rounded-lg p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-text-muted">Embedded CVEs:</span>
+                <span className="font-bold text-text-primary">{embeddedCVEs}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-text-muted">Downloaded CVEs:</span>
+                <span className="font-bold text-text-primary">{downloadedCVEs}</span>
+              </div>
+              <div className="flex justify-between text-sm pt-2 border-t border-theme">
+                <span className="text-accent-purple font-semibold">Total CVEs:</span>
+                <span className="font-bold text-accent-purple">{embeddedCVEs + downloadedCVEs}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-text-muted">Last Updated:</span>
+                <span className="text-text-muted">{lastUpdate ? new Date(lastUpdate).toLocaleDateString() : 'Never'}</span>
+              </div>
+            </div>
+
+            {/* Update Button */}
             <button
-              onClick={() => setSnmpEnabled(!snmpEnabled)}
-              className={`w-12 h-6 rounded-full transition-colors ${
-                snmpEnabled ? 'bg-accent-blue' : 'bg-bg-tertiary'
+              onClick={handleSyncDatabase}
+              disabled={isSyncing}
+              className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm shadow-lg transition-all ${
+                isSyncing
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-accent-purple to-indigo-600 hover:from-accent-purple/90 hover:to-indigo-600/90 text-white shadow-accent-purple/30'
               }`}
             >
-              <div
-                className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
-                  snmpEnabled ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'Updating...' : 'Update Database Now'}
             </button>
-          </div>
 
-          {snmpEnabled && (
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                SNMP Community String
-              </label>
-              <input
-                type="text"
-                value={snmpCommunity}
-                onChange={(e) => setSnmpCommunity(e.target.value)}
-                className="w-full px-4 py-2.5 bg-bg-tertiary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
-                placeholder="public"
-              />
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Demo Mode Settings */}
-      <section className="card p-6 mb-6">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">🎪 Demo Mode</h2>
-        
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-text-secondary mb-1">
-                Enable Demo Mode
-              </label>
-              <p className="text-xs text-text-muted">
-                Use pre-loaded sample network data for offline demonstrations
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer ml-4">
-              <input
-                type="checkbox"
-                checked={localStorage.getItem('demo-mode-enabled') === 'true'}
-                onChange={(e) => {
-                  localStorage.setItem('demo-mode-enabled', e.target.checked.toString());
-                  window.location.reload(); // Reload to apply demo mode
-                }}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-bg-tertiary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-blue rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-blue"></div>
-            </label>
-          </div>
-
-          {/* Demo Mode Info */}
-          {localStorage.getItem('demo-mode-enabled') === 'true' && (
-            <div className="bg-accent-amber/10 border border-accent-amber/30 rounded-lg p-4">
-              <p className="text-sm text-text-secondary mb-2">
-                ⚠️ <strong>Demo Mode Active</strong>
-              </p>
-              <ul className="text-xs text-text-muted space-y-1 ml-4">
-                <li>• Network scans return sample data instantly</li>
-                <li>• 15 realistic demo devices with vulnerabilities</li>
-                <li>• All features work offline</li>
-                <li>• Perfect for presentations and demonstrations</li>
-              </ul>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Vulnerability Database Settings */}
-      <section className="card p-6 mb-6">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Vulnerability Database</h2>
-        
-        <div className="space-y-6">
-          {/* Auto-update Toggle */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-text-primary">Auto-update from NVD</p>
-              <p className="text-sm text-text-muted">
-                Automatically sync CVE database with National Vulnerability Database
-              </p>
-            </div>
-            <button
-              onClick={() => setAutoUpdateVulnDB(!autoUpdateVulnDB)}
-              className={`w-12 h-6 rounded-full transition-colors ${
-                autoUpdateVulnDB ? 'bg-accent-blue' : 'bg-bg-tertiary'
-              }`}
-            >
-              <div
-                className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
-                  autoUpdateVulnDB ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* Sync Range Selector */}
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Sync Range
-            </label>
-            <select
-              value={syncRange}
-              onChange={(e) => setSyncRange(e.target.value)}
-              className="w-full px-4 py-2.5 bg-bg-tertiary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
-            >
-              <option value="latest_1000">Latest 1,000 CVEs (~500 KB)</option>
-              <option value="latest_5000">Latest 5,000 CVEs (~2.5 MB)</option>
-              <option value="last_30_days">Last 30 Days (~200 KB)</option>
-              <option value="last_90_days">Last 90 Days (~600 KB)</option>
-              <option value="last_6_months">Last 6 Months (~2 MB)</option>
-              <option value="last_1_year">Last 1 Year (~4 MB)</option>
-              <option value="custom">Custom Date Range</option>
-            </select>
-            <p className="text-xs text-text-muted mt-1">
-              Larger ranges provide better coverage but take longer to sync
+            <p className="text-xs text-text-muted text-center">
+              💡 Vulnerability database works offline by default.
             </p>
           </div>
+        )}
+      </div>
 
-          {/* Database Status */}
-          <div className="bg-bg-tertiary rounded-lg p-4 space-y-2">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-text-muted">Embedded CVEs:</span>
-              <span className="font-mono text-text-primary font-semibold">{embeddedCVEs}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-text-muted">Downloaded CVEs:</span>
-              <span className="font-mono text-text-primary font-semibold">{downloadedCVEs}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm border-t border-white/10 pt-2">
-              <span className="text-text-muted">Total CVEs:</span>
-              <span className="font-mono text-accent-blue font-bold">{embeddedCVEs + downloadedCVEs}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-text-muted">Last Updated:</span>
-              <span className="text-text-primary">
-                {lastUpdate ? new Date(lastUpdate).toLocaleDateString() : 'Never'}
-              </span>
-            </div>
-          </div>
+      {/* Action Buttons */}
+      <div className="flex items-center justify-between mt-6">
+        <button
+          onClick={handleReset}
+          className="flex items-center gap-2 px-4 py-2 border-2 border-theme hover:border-accent-purple rounded-lg text-text-secondary hover:text-text-primary transition-all"
+        >
+          <RefreshCw className="w-4 h-4" />
+          <span className="text-sm font-medium">Reset to Defaults</span>
+        </button>
 
-          {/* Manual Sync Button */}
-          <button
-            onClick={handleSyncDatabase}
-            disabled={isSyncing}
-            className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
-              isSyncing
-                ? 'bg-accent-blue/50 text-white/70 cursor-not-allowed'
-                : 'bg-accent-blue hover:bg-accent-blue/80 text-white'
-            }`}
-          >
-            <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Syncing...' : 'Update Now'}</span>
-          </button>
-          
-          {/* Progress Bar */}
-          {isSyncing && syncProgress > 0 && (
-            <div className="space-y-1">
-              <div className="h-2 bg-bg-secondary rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-accent-blue transition-all duration-300"
-                  style={{ width: `${syncProgress}%` }}
-                />
-              </div>
-              <p className="text-xs text-center text-text-muted">
-                {syncProgress}% - Fetching CVE data...
-              </p>
-            </div>
-          )}
-          
-          <p className="text-xs text-text-muted text-center">
-            💡 Vulnerability database works offline by default. Online sync is optional.
-          </p>
-        </div>
-      </section>
-
-      {/* Actions */}
-      <div className="flex items-center gap-3">
-        <button 
+        <button
           onClick={handleSave}
           disabled={!hasChanges && saveStatus === 'idle'}
-          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
-            saveStatus === 'saved' 
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm shadow-lg transition-all ${
+            saveStatus === 'saved'
               ? 'bg-accent-green text-white'
-              : saveStatus === 'error'
-              ? 'bg-accent-red text-white'
               : hasChanges
-              ? 'bg-accent-blue hover:bg-accent-blue/80 text-white'
-              : 'bg-accent-blue/50 text-white/70 cursor-not-allowed'
+              ? 'bg-slate-800 dark:bg-slate-900 hover:bg-slate-700 dark:hover:bg-slate-800 text-white'
+              : 'bg-gray-400 text-gray-200 cursor-not-allowed'
           }`}
         >
-          {saveStatus === 'saving' ? (
-            <RefreshCw className="w-5 h-5 animate-spin" />
-          ) : saveStatus === 'saved' ? (
-            <Check className="w-5 h-5" />
-          ) : saveStatus === 'error' ? (
-            <AlertCircle className="w-5 h-5" />
-          ) : (
-            <Save className="w-5 h-5" />
-          )}
-          <span>
-            {saveStatus === 'saving' ? 'Saving...' 
-              : saveStatus === 'saved' ? 'Saved!' 
-              : saveStatus === 'error' ? 'Error!' 
-              : 'Save Settings'}
-          </span>
+          <Save className="w-4 h-4" />
+          {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save Settings'}
         </button>
-        <button 
-          onClick={handleReset}
-          className="flex items-center gap-2 px-6 py-3 bg-bg-tertiary hover:bg-bg-hover text-text-secondary rounded-lg font-medium transition-colors"
-        >
-          <RefreshCw className="w-5 h-5" />
-          <span>Reset to Defaults</span>
-        </button>
-        {hasChanges && (
-          <span className="text-sm text-accent-amber">Unsaved changes</span>
-        )}
       </div>
     </div>
   );

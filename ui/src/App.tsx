@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { ScanProvider, useScanContext, HostInfo } from './hooks/useScan';
-import { useSidebarCollapse } from './hooks/useSidebarCollapse';
 import { useKeyboardShortcuts, SHORTCUTS } from './hooks/useKeyboardShortcuts';
 import Sidebar from './components/layout/Sidebar';
 import Titlebar from './components/layout/Titlebar';
@@ -26,10 +26,34 @@ type Page = 'dashboard' | 'topology' | 'devices' | 'vulnerabilities' | 'alerts' 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [selectedDevice, setSelectedDevice] = useState<HostInfo | null>(null);
-  const { scan, isScanning } = useScanContext();
-  const { isCollapsed, toggle: toggleSidebar } = useSidebarCollapse();
+  const [unreadAlertsCount, setUnreadAlertsCount] = useState(0);
+  const { scan, isScanning, scanStatus } = useScanContext();
   const { toggleTheme } = useTheme();
   const { shouldShow: showWelcome, markAsShown } = useWelcomeScreen();
+
+  // Fetch unread alerts count
+  const fetchUnreadAlertsCount = async () => {
+    try {
+      const alerts = await invoke<any[]>('get_unread_alerts');
+      setUnreadAlertsCount(alerts.filter(a => !a.is_read).length);
+    } catch (error) {
+      console.error('Failed to fetch unread alerts:', error);
+      setUnreadAlertsCount(0);
+    }
+  };
+
+  // Load unread alerts count on mount and when page changes
+  useEffect(() => {
+    fetchUnreadAlertsCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchUnreadAlertsCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Debug: Monitor isScanning changes
+  useEffect(() => {
+    console.log('isScanning state changed:', isScanning);
+  }, [isScanning]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -38,7 +62,6 @@ function AppContent() {
     { ...SHORTCUTS.DEVICES, handler: () => setCurrentPage('devices') },
     { ...SHORTCUTS.SETTINGS, handler: () => setCurrentPage('settings') },
     { ...SHORTCUTS.SCAN, handler: () => !isScanning && scan() },
-    { ...SHORTCUTS.TOGGLE_SIDEBAR, handler: toggleSidebar },
     { ...SHORTCUTS.TOGGLE_THEME, handler: toggleTheme },
   ]);
 
@@ -51,13 +74,11 @@ function AppContent() {
   };
 
   const handleScan = () => {
+    console.log('handleScan called, current isScanning:', isScanning);
     scan();
   };
 
-  const handleSearch = (query: string) => {
-    // TODO: Implement global search functionality
-    console.log('Search query:', query);
-  };
+
 
   const renderPage = () => {
     switch (currentPage) {
@@ -80,7 +101,7 @@ function AppContent() {
       case 'reports':
         return <Reports />;
       default:
-        return <Dashboard onDeviceClick={handleDeviceSelect} onScan={handleScan} />;
+        return <Dashboard onDeviceClick={handleDeviceSelect} />;
     }
   };
 
@@ -100,11 +121,8 @@ function AppContent() {
       {/* Sidebar */}
       <Sidebar 
         currentPage={currentPage} 
-        onNavigate={setCurrentPage} 
-        onScan={handleScan}
-        isScanning={isScanning}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={toggleSidebar}
+        onNavigate={setCurrentPage}
+        vulnerabilityCount={2}
       />
       
       {/* Main Content Area */}
@@ -115,8 +133,19 @@ function AppContent() {
         {/* Demo Mode Banner */}
         <DemoBanner />
         
-        {/* Top Header (Search, Notifications, Theme) */}
-        <TopHeader onSearch={handleSearch} />
+        {/* Top Header (Page Title, Status, Scan Controls) */}
+        <TopHeader 
+          currentPage={currentPage} 
+          isScanning={isScanning}
+          scanStatus={scanStatus}
+          onStartScan={handleScan}
+          onStopScan={() => {
+            // TODO: Implement stop scan functionality if needed
+            console.log('Stop scan requested');
+          }}
+          onNavigateToAlerts={() => setCurrentPage('alerts')}
+          unreadAlertsCount={unreadAlertsCount}
+        />
         
         {/* Page Content */}
         <main className="flex-1 overflow-auto">
@@ -135,8 +164,8 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <ScanProvider>
-          <ToastProvider />
           <AppContent />
+          <ToastProvider />
         </ScanProvider>
       </ThemeProvider>
     </ErrorBoundary>
