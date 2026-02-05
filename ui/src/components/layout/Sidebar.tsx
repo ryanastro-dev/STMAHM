@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import NavSection from './NavSection';
 import AdminProfile from './AdminProfile';
 
 type Page = 'dashboard' | 'topology' | 'devices' | 'vulnerabilities' | 'alerts' | 'tools' | 'reports' | 'settings' | 'profile' | 'demo';
@@ -21,7 +20,6 @@ type Page = 'dashboard' | 'topology' | 'devices' | 'vulnerabilities' | 'alerts' 
 interface SidebarProps {
   currentPage: Page;
   onNavigate: (page: Page) => void;
-  vulnerabilityCount?: number;
 }
 
 interface NavItemData {
@@ -39,7 +37,6 @@ interface NavGroupData {
 export default function Sidebar({ 
   currentPage, 
   onNavigate,
-  vulnerabilityCount = 2,
 }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 

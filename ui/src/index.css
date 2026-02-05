@@ -94,7 +94,77 @@
     "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
     sans-serif;
   --font-mono: "JetBrains Mono", "Consolas", "Monaco", monospace;
+
+  /* 2026 Design System - Professional Enterprise Palette */
+  --glass-bg: rgba(15, 23, 42, 0.75);
+  --glass-border: rgba(71, 85, 105, 0.3);
+  --glass-hover: rgba(71, 85, 105, 0.15);
+  
+  /* Professional Gradients - Muted & Sophisticated */
+  --gradient-slate: linear-gradient(135deg, #475569 0%, #334155 100%);
+  --gradient-indigo: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  --gradient-teal: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+  --gradient-violet: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+  --gradient-mesh: radial-gradient(ellipse at top, rgba(79, 70, 229, 0.08), transparent 50%);
+  
+  /* Enterprise Accent Colors */
+  --color-accent-navy: #1e40af;
+  --color-accent-indigo: #4f46e5;
+  --color-accent-teal: #0d9488;
+  --color-accent-violet: #7c3aed;
+  --color-accent-amber: #d97706;
+  --color-accent-rose: #e11d48;
+  
+  /* Professional Status Colors - Muted */
+  --color-status-success: #059669;
+  --color-status-warning: #d97706;
+  --color-status-error: #dc2626;
+  --color-status-info: #0284c7;
+  
+  /* Enhanced Glow Shadows - Subtle */
+  --shadow-glow-green: 0 0 24px rgba(5, 150, 105, 0.25);
+  --shadow-glow-indigo: 0 0 24px rgba(79, 70, 229, 0.25);
+  --shadow-glow-teal: 0 0 24px rgba(13, 148, 136, 0.25);
+  
+  /* Backdrop Blur */
+  --blur-glass: 20px;
 }
+
+/* ================= LIGHT THEME (Professional) ================= */
+:root:not(.dark),
+.light {
+  /* Light Mode - Professional Enterprise Palette */
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(148, 163, 184, 0.3);
+  --glass-hover: rgba(148, 163, 184, 0.15);
+  
+  /* Light Mode Gradients */
+  --gradient-slate: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+  --gradient-indigo: linear-gradient(135deg, #818cf8 0%, #a5b4fc 100%);
+  --gradient-teal: linear-gradient(135deg, #5eead4 0%, #99f6e4 100%);
+  --gradient-violet: linear-gradient(135deg, #c4b5fd 0%, #ddd6fe 100%);
+  --gradient-mesh: radial-gradient(ellipse at top, rgba(99, 102, 241, 0.05), transparent 50%);
+  
+  /* Light Mode Accent Colors */
+  --color-accent-navy: #1e40af;
+  --color-accent-indigo: #4338ca;
+  --color-accent-teal: #0f766e;
+  --color-accent-violet: #6d28d9;
+  --color-accent-amber: #b45309;
+  --color-accent-rose: #be123c;
+  
+  /* Light Mode Status Colors */
+  --color-status-success: #047857;
+  --color-status-warning: #b45309;
+  --color-status-error: #b91c1c;
+  --color-status-info: #0369a1;
+  
+  /* Light Mode Glow Shadows - Very Subtle */
+  --shadow-glow-green: 0 0 16px rgba(15, 118, 110, 0.15);
+  --shadow-glow-indigo: 0 0 16px rgba(67, 56, 202, 0.15);
+  --shadow-glow-teal: 0 0 16px rgba(15, 118, 110, 0.15);
+}
+
 
 /* ================= DARK THEME (Default - Luxury) ================= */
 :root,
@@ -559,6 +629,34 @@ body {
 
 .dark .react-flow__controls button svg {
   fill: #f8fafc !important;
+}
+
+/* ================= CUSTOM ANIMATIONS ================= */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* ================= PLATFORM-SPECIFIC STYLES ================= */

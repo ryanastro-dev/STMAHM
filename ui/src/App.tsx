@@ -78,12 +78,14 @@ function AppContent() {
     scan();
   };
 
-
+  const handlePageChange = (page: Page) => {
+    setCurrentPage(page);
+  };
 
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard onDeviceClick={handleDeviceSelect} />;
+        return <Dashboard />;
       case 'topology':
         return <TopologyView onDeviceClick={handleDeviceSelect} />;
       case 'devices':
@@ -101,7 +103,7 @@ function AppContent() {
       case 'reports':
         return <Reports />;
       default:
-        return <Dashboard onDeviceClick={handleDeviceSelect} />;
+        return <Dashboard />;
     }
   };
 
@@ -121,8 +123,7 @@ function AppContent() {
       {/* Sidebar */}
       <Sidebar 
         currentPage={currentPage} 
-        onNavigate={setCurrentPage}
-        vulnerabilityCount={2}
+        onNavigate={handlePageChange}
       />
       
       {/* Main Content Area */}
