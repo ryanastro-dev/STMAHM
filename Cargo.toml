@@ -1,6 +1,6 @@
 [package]
 name = "host-discovery"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 description = "Network Topology Mapper - Phase 1: Host Discovery (ICMP + Active ARP)"
 authors = ["Network Topology Mapper Team"]
